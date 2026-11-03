@@ -161,7 +161,7 @@ test('前端包含到格事件特效與購地蓋房動畫',()=>{
   assert.match(style,/\.tile-effect-overlay/);
   assert.match(style,/@keyframes tile-fx-spin/);
   assert.match(style,/@keyframes tile-build-rise/);
-  assert.match(style,/\.tile\.tile-effect-build/);
+  assert.match(style,/\.tile\.tile-effect-building/);
 });
 
 
@@ -197,8 +197,8 @@ test('格子動畫期間隱藏原主圖及常駐裝飾，完成或中斷後自�
   const style=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
   assert.match(style,/\.board \.tile\.tile-effect-active > \.tile-icon,\s*\.board \.tile\.tile-effect-active > \.tile-ambient\s*\{\s*visibility:hidden;/);
   assert.ok(app.includes("tile.classList.add('tile-effect-active')"),'動畫開始時應套用隱藏狀態');
-  assert.ok(app.includes("tile.classList.remove('tile-effect-active','tile-effect-build')"),'正常結束時應恢復圖示');
-  assert.ok(app.includes("active.tile?.classList.remove('tile-effect-active','tile-effect-build')"),'動畫重播或中斷時應恢復圖示');
+  assert.ok(app.includes("tile.classList.remove('tile-effect-active','tile-effect-building')"),'正常結束時應恢復圖示');
+  assert.ok(app.includes("active.tile?.classList.remove('tile-effect-active','tile-effect-building')"),'動畫重播或中斷時應恢復圖示');
   assert.ok(app.includes('for(const tileId of tileEffectTimers.keys())clearTileEffect(tileId)'),'棋盤重繪前應清理動畫');
   assert.doesNotMatch(style,/\.tile-effect-active > \.tile-name\s*\{/,'格子名稱仍應保留');
 });
@@ -320,4 +320,33 @@ test('v1.7.2 題目優先狀態在平板上獨佔一列，解析依然跟隨操�
   assert.ok(index.includes('id="result-panel"'));
   assert.ok(index.includes('id="achievement-panel"'));
   assert.ok(index.includes('class="panel current-panel"'));
+});
+
+// v1.7.3：購地建造動畫不得把格子撐大或顯示大片色塊。
+test('v1.7.3 購地只顯示一棟房子，沒有額外標籤、槌子或背景遮罩',()=>{
+  const style=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
+  const start=app.indexOf("if(mode==='build'){");
+  const end=app.indexOf("}else{",start);
+  assert.ok(start>=0&&end>start,'應具有購地特效的獨立分支');
+  const block=app.slice(start,end);
+  assert.ok(block.includes("class=\"tile-effect-house\""));
+  assert.ok(block.includes('>🏠</span>'));
+  assert.ok(block.includes("tile.classList.add('tile-effect-building')"));
+  assert.doesNotMatch(block,/tile-effect-badge|tile-effect-build-store|tile-effect-build-hammer|tile-effect-build-flash/);
+  assert.doesNotMatch(style,/\.board \.tile-effect-build\s*\{/,'不能用一般類別選擇器設定整格寬高');
+  assert.match(style,/\.board \.tile\.tile-effect-building\{overflow:hidden;isolation:isolate\}/);
+  assert.match(style,/\.board \.tile > \.tile-effect-overlay\.mode-build\s*\{[^}]*inset:0;[^}]*width:100%;height:100%;[^}]*overflow:hidden;[^}]*background:transparent;box-shadow:none/s);
+  assert.match(style,/\.board \.tile > \.tile-effect-overlay\.mode-build > \.tile-effect-house/);
+  assert.doesNotMatch(style,/\.board \.tile-effect-overlay\.mode-build\s*\{[^}]*radial-gradient/);
+  assert.doesNotMatch(style,/\.board \.tile\.tile-effect-build\s*\{[^}]*box-shadow/);
+});
+
+test('v1.7.3 購地結束或中斷會恢復原圖，原有其他到格特效繼續存在',()=>{
+  const style=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
+  assert.ok(app.includes("tile.classList.remove('tile-effect-active','tile-effect-building')"));
+  assert.ok(app.includes("active.tile?.classList.remove('tile-effect-active','tile-effect-building')"));
+  assert.ok(app.includes("playTileEffect(tileId,'landing'"));
+  assert.ok(app.includes("playTileEffect(tileId,'build'"));
+  assert.match(style,/@keyframes tile-build-rise/);
+  assert.match(style,/@media\(prefers-reduced-motion:reduce\)[\s\S]*?\.tile-effect-house\{animation:none!important\}/);
 });

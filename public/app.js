@@ -1,7 +1,7 @@
 /* 小數富翁前端：所有資產、擲骰、判分都以伺服器狀態為準。 */
 (() => {
   'use strict';
-  const CLIENT_VERSION='1.7.2';
+  const CLIENT_VERSION='1.7.3';
   const socket=io({transports:['websocket','polling'],reconnection:true});
   const $=id=>document.getElementById(id);
   const esc=(value)=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -139,7 +139,7 @@
     if(active){
       clearTimeout(active.timer);
       active.el?.remove();
-      active.tile?.classList.remove('tile-effect-active','tile-effect-build');
+      active.tile?.classList.remove('tile-effect-active','tile-effect-building');
       tileEffectTimers.delete(tileId);
     }
   }
@@ -201,8 +201,10 @@
     overlay.className=`tile-effect-overlay ${spec.className||'fx-pop'} mode-${mode}`;
     overlay.setAttribute('aria-hidden','true');
     if(mode==='build'){
-      overlay.innerHTML=`<span class="tile-effect-badge">🏗️ 購地成功</span><div class="tile-effect-build tile-effect-build-${esc(spec.theme||'property')}"><span class="tile-effect-build-icon tile-effect-build-store">${esc(spec.storeIcon||'🏠')}</span><span class="tile-effect-build-icon tile-effect-build-house">🏠</span><span class="tile-effect-build-icon tile-effect-build-hammer">🔨</span><span class="tile-effect-build-flash">✨ ✦</span></div>`;
-      tile.classList.add('tile-effect-build');
+      // 購地成功時只繪製一棟房子；不加入徽章、色塊或第二個店面圖示。
+      // 狀態類別與圖示類別不得重名，以免 CSS 100% 尺寸套到整個棋盤格。
+      overlay.innerHTML='<span class="tile-effect-house" aria-hidden="true">🏠</span>';
+      tile.classList.add('tile-effect-building');
     }else{
       overlay.innerHTML=`<span class="tile-effect-badge">${esc(spec.badge||'事件觸發')}</span><span class="tile-effect-icon">${esc(spec.icon||'✨')}</span><span class="tile-effect-ring"></span><span class="tile-effect-stars">✦ ✧ ✦</span>`;
     }
@@ -211,7 +213,7 @@
     const duration=mode==='build' ? (reducedMotion?380:1700) : (reducedMotion?280:1350);
     const timer=setTimeout(()=>{
       overlay.remove();
-      tile.classList.remove('tile-effect-active','tile-effect-build');
+      tile.classList.remove('tile-effect-active','tile-effect-building');
       tileEffectTimers.delete(tileId);
     },duration);
     tileEffectTimers.set(tileId,{timer,el:overlay,tile});

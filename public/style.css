@@ -391,34 +391,39 @@
 .board .tile-effect-overlay.fx-alert .tile-effect-icon,.board .tile-effect-overlay.fx-boss .tile-effect-icon{animation:tile-fx-alert .9s ease-in-out both}
 .board .tile-effect-overlay.fx-compare .tile-effect-icon{animation:tile-fx-sway .95s ease-in-out both}
 .board .tile-effect-overlay .tile-effect-ring{animation:tile-fx-ring 1.05s ease-out both}
-.board .tile-effect-overlay.mode-build{inset:-10px;background:radial-gradient(circle at center,#ffffffca 0,#fff7ea99 42%,transparent 72%)}
-.board .tile-effect-build{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center}
-.board .tile-effect-build-icon{position:absolute;line-height:1;filter:drop-shadow(0 6px 6px #243b5530)}
-.board .tile-effect-build-store{font-size:30px;animation:tile-build-rise .85s cubic-bezier(.25,.9,.3,1) both;color:var(--player-color)}
-.board .tile-effect-build-house{font-size:25px;opacity:.92;animation:tile-build-bounce .85s .12s ease-out both}
-.board .tile-effect-build-hammer{right:9%;top:16%;font-size:18px;animation:tile-build-hammer .8s .14s ease-in-out both}
-.board .tile-effect-build-flash{position:absolute;bottom:7%;font-size:15px;color:#d88b58;letter-spacing:8px;animation:tile-build-flash .9s .16s ease-out both}
-.board .tile.tile-effect-build{box-shadow:0 0 0 4px color-mix(in srgb,var(--player-color) 42%,#fff),0 10px 22px #00000010}
+
+/* v1.7.3：房產建造特效僅在單一格子內，沒有遮蓋全圖的色塊。
+   使用 tile-effect-building 避免與原本內部 tile-effect-build 尺寸類別衝突。 */
+.board .tile.tile-effect-building{overflow:hidden;isolation:isolate}
+.board .tile > .tile-effect-overlay.mode-build{
+  position:absolute;inset:0;width:100%;height:100%;box-sizing:border-box;
+  overflow:hidden;display:flex;align-items:center;justify-content:center;
+  border:0;border-radius:inherit;background:transparent;box-shadow:none;pointer-events:none;
+}
+.board .tile > .tile-effect-overlay.mode-build > .tile-effect-house{
+  position:relative;display:block;line-height:1;font-size:clamp(22px,2.4vw,37px);
+  transform-origin:center bottom;filter:drop-shadow(0 3px 2px #243b5529);
+  animation:tile-build-rise .85s cubic-bezier(.25,.9,.3,1) both;
+}
 @keyframes tile-fx-spin{0%{transform:scale(.45) rotate(-240deg);opacity:0}28%{opacity:1}100%{transform:scale(1.06) rotate(0);opacity:1}}
 @keyframes tile-fx-float{0%{transform:translateY(14px) scale(.55);opacity:0}35%{opacity:1}55%{transform:translateY(-8px) scale(1.08)}100%{transform:translateY(0) scale(1)}}
 @keyframes tile-fx-pop{0%{transform:scale(.38);opacity:0}45%{opacity:1}65%{transform:scale(1.24)}100%{transform:scale(1)}}
 @keyframes tile-fx-alert{0%{transform:translateX(-10px) scale(.72);opacity:0}18%{opacity:1}35%{transform:translateX(9px) scale(1.02)}52%{transform:translateX(-6px)}70%{transform:translateX(6px)}100%{transform:translateX(0) scale(1)}}
 @keyframes tile-fx-sway{0%{transform:rotate(-14deg) scale(.7);opacity:0}24%{opacity:1}50%{transform:rotate(14deg) scale(1.12)}100%{transform:rotate(0) scale(1)}}
 @keyframes tile-fx-ring{0%{transform:scale(.3);opacity:.88}100%{transform:scale(1.2);opacity:0}}
-@keyframes tile-build-rise{0%{transform:translateY(24px) scale(.3);opacity:0}36%{opacity:1}75%{transform:translateY(-5px) scale(1.16)}100%{transform:translateY(0) scale(1)}}
-@keyframes tile-build-bounce{0%{transform:translateY(19px) scale(.5);opacity:0}40%{opacity:1}70%{transform:translateY(-2px) scale(1.1)}100%{transform:translateY(0) scale(.92)}}
-@keyframes tile-build-hammer{0%{transform:rotate(-40deg) translateY(-2px);opacity:0}25%{opacity:1}48%{transform:rotate(16deg) translateY(1px)}72%{transform:rotate(-20deg) translateY(-1px)}100%{transform:rotate(0) translateY(0);opacity:.9}}
-@keyframes tile-build-flash{0%{transform:translateY(10px);opacity:0}35%{opacity:1}100%{transform:translateY(-6px);opacity:0}}
+@keyframes tile-build-rise{
+  0%{transform:translateY(16px) scale(.25);opacity:0}
+  45%{transform:translateY(0) scale(1.08);opacity:1}
+  75%{transform:translateY(-2px) scale(1.03);opacity:1}
+  100%{transform:translateY(0) scale(1);opacity:1}
+}
 @media(max-width:640px){
   .board .tile-effect-badge{font-size:8px;padding:2px 7px;top:-9px}
   .board .tile-effect-icon{font-size:24px}
   .board .tile-effect-stars{font-size:10px;letter-spacing:4px}
-  .board .tile-effect-build-store{font-size:24px}
-  .board .tile-effect-build-house{font-size:20px}
-  .board .tile-effect-build-hammer{font-size:14px}
 }
 @media(prefers-reduced-motion:reduce){
-  .board .tile-effect-icon,.board .tile-effect-ring,.board .tile-effect-build-icon,.board .tile-effect-build-flash{animation:none!important}
+  .board .tile-effect-icon,.board .tile-effect-ring,.board .tile > .tile-effect-overlay.mode-build > .tile-effect-house{animation:none!important}
 }
 
 
