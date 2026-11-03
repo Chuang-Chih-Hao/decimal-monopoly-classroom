@@ -132,3 +132,19 @@ test('12 種選角動物物種不重複，前後端清單與配色同步',()=>{
   assert.deepEqual([...parsedNames.matchAll(/'([^']+)'/g)].map(x=>x[1]),names);
   assert.deepEqual(Object.keys(palette.COLORS),expected);
 });
+
+// v1.6.3：水豚外觀與選角名稱應可直接辨認，不影響其他角色的 ID。
+test('水豚使用側身 SVG，12 種動物在選角格都有可見中文名稱',()=>{
+  const svg=fs.readFileSync(path.join(__dirname,'../public/capybara.svg'),'utf8');
+  const css=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
+  assert.match(svg,/<svg\s[^>]*viewBox="0 0 120 120"/);
+  assert.match(svg,/<title>水豚<\/title>/);
+  assert.match(svg,/Side profile/);
+  assert.match(svg,/<path[^>]+d="M12 72/); // long side body, not round face
+  assert.ok(app.includes('const animalHtml=a=>a===\'capybara\'?'), '水豚仍使用自訂 SVG');
+  assert.ok(app.includes('src="/capybara.svg"'), '所有畫面共用同一圖示');
+  assert.ok(app.includes('<span class="animal-option-name">${esc(animalNames[i])}</span>'));
+  assert.match(css,/\.animal-option-name\s*\{/);
+  assert.match(css,/\.animal-picker \.animal-option\s*\{/);
+  assert.equal(ANIMALS[0],'capybara');
+});

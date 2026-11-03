@@ -207,7 +207,12 @@
 .person-color-dot{display:inline-block;vertical-align:middle;width:11px;height:11px;border-radius:50%;margin-right:5px;background:var(--player-color);box-shadow:0 0 0 2px var(--player-light);flex:none}
 .animal-option{position:relative;display:flex;align-items:center;justify-content:center;background:var(--player-light);border-bottom:4px solid var(--player-color)}
 .animal-option.selected{border:2px solid var(--player-color);border-bottom-width:5px;background:var(--player-light);box-shadow:0 0 0 2px var(--player-light)}
-.animal-option-icon{display:flex;align-items:center;justify-content:center}
+.animal-option-icon{display:flex;align-items:center;justify-content:center;line-height:1}
+/* Show names under every mascot so the custom capybara cannot be mistaken for a bear. */
+.animal-picker .animal-option{height:66px;flex-direction:column;gap:2px;padding:3px 1px 6px}
+.animal-option-name{font-size:10px;font-weight:900;line-height:1.15;white-space:nowrap;color:#304154}
+.animal-picker .animal-option .animal-img{width:35px;height:35px}
+@media(max-width:640px){.animal-picker .animal-option{height:60px}.animal-picker .animal-option .animal-img{width:32px;height:32px}.animal-option-name{font-size:9px}}
 .animal-color-dot{position:absolute;right:3px;bottom:3px;width:10px;height:10px;border-radius:50%;background:var(--player-color);border:1px solid #fff}
 .identity-chip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--player-color);border-radius:99px;padding:4px 8px;background:var(--player-light);color:#253b4e;font-weight:900}
 .identity-chip small{color:#5c6e80;font-size:10px}

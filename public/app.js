@@ -1,7 +1,7 @@
 /* 小數富翁前端：所有資產、擲骰、判分都以伺服器狀態為準。 */
 (() => {
   'use strict';
-  const CLIENT_VERSION='1.6.2';
+  const CLIENT_VERSION='1.6.3';
   const socket=io({transports:['websocket','polling'],reconnection:true});
   const $=id=>document.getElementById(id);
   const esc=(value)=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -145,7 +145,7 @@
       btn.title=animalNames[i];btn.setAttribute('aria-label',animalNames[i]);btn.setAttribute('aria-pressed',String(a===selectedAnimal));
       const paint=playerColors.forAnimal(a);
       btn.style.cssText=`--player-color:${paint.hex};--player-light:${paint.light}`;
-      btn.innerHTML=`<span class="animal-option-icon">${animalHtml(a)}</span><span class="animal-color-dot" aria-hidden="true"></span>`;
+      btn.innerHTML=`<span class="animal-option-icon" aria-hidden="true">${animalHtml(a)}</span><span class="animal-option-name">${esc(animalNames[i])}</span><span class="animal-color-dot" aria-hidden="true"></span>`;
       btn.title=`${animalNames[i]}｜${paint.name}`;
       btn.addEventListener('click',()=>{selectedAnimal=a;renderAnimalPicker();});picker.appendChild(btn);
     });

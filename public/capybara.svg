@@ -1,15 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="水豚">
- <ellipse cx="60" cy="65" rx="54" ry="48" fill="#f4deb1"/>
- <ellipse cx="62" cy="76" rx="43" ry="32" fill="#b77944"/>
- <ellipse cx="37" cy="37" rx="13" ry="18" fill="#986037" transform="rotate(-17 37 37)"/>
- <ellipse cx="88" cy="37" rx="13" ry="18" fill="#986037" transform="rotate(17 88 37)"/>
- <ellipse cx="37" cy="38" rx="6" ry="9" fill="#cf9a66" transform="rotate(-17 37 38)"/>
- <ellipse cx="88" cy="38" rx="6" ry="9" fill="#cf9a66" transform="rotate(17 88 38)"/>
- <path d="M20 53C24 32 42 22 67 26c24 4 39 22 38 49-2 25-20 36-47 36-28 0-45-14-43-37z" fill="#b77944"/>
- <path d="M41 75c11-12 35-14 50-1 5 8 3 20-7 25-16 8-33 4-42-5-7-7-8-13-1-19z" fill="#dca879"/>
- <circle cx="43" cy="61" r="5.3" fill="#352c28"/><circle cx="87" cy="61" r="5.3" fill="#352c28"/>
- <circle cx="45" cy="59" r="1.8" fill="#fff8e4"/><circle cx="89" cy="59" r="1.8" fill="#fff8e4"/>
- <ellipse cx="66" cy="78" rx="13" ry="9" fill="#6f4736"/>
- <path d="M66 84v7m0 0q-8 7-15 0m15 0q8 7 15 0" fill="none" stroke="#684332" stroke-width="2.5" stroke-linecap="round"/>
- <circle cx="33" cy="84" r="8" fill="#ea9f83" opacity=".4"/><circle cx="98" cy="84" r="8" fill="#ea9f83" opacity=".4"/>
+  <title>水豚</title>
+  <!-- Side profile: a long, barrel-shaped body, small ears and a broad square muzzle. -->
+  <ellipse cx="57" cy="106" rx="49" ry="6" fill="#704c36" opacity=".13"/>
+  <path d="M22 83c-5 7-6 16-4 22h12l7-18z" fill="#855331" stroke="#6f412a" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M66 88c-3 8-3 13-2 17h13l6-21z" fill="#96603a" stroke="#6f412a" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M12 72c0-23 18-36 43-36 27 0 47 17 50 41 2 15-7 23-24 23H42C23 100 12 91 12 72z" fill="#a96a3e" stroke="#75482d" stroke-width="2.6" stroke-linejoin="round"/>
+  <path d="M22 61c8-13 22-19 42-17" stroke="#c58c58" stroke-width="4" stroke-linecap="round" opacity=".85" fill="none"/>
+  <path d="M85 54c-5-11-3-20 4-22 8-3 13 4 12 15" fill="#92552f" stroke="#75482d" stroke-width="2.3" stroke-linejoin="round"/>
+  <path d="M91 39c4-5 6-2 6 3" stroke="#d9ab70" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <path d="M76 48c4-15 15-19 26-12 9 6 13 17 12 31l-1 5c3 2 5 7 3 12-3 8-16 13-28 11-15-3-21-17-19-30z" fill="#b87848" stroke="#75482d" stroke-width="2.8" stroke-linejoin="round"/>
+  <path d="M86 41c-3-8-2-16 5-18 6-1 10 7 8 15" fill="#98592f" stroke="#75482d" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M95 68c5-4 16-3 21 3 5 6 1 17-6 20-9 5-22 2-24-8-1-6 2-11 9-15z" fill="#cb9663"/>
+  <circle cx="95" cy="56" r="3.5" fill="#2f2a28"/>
+  <circle cx="96" cy="55" r="1" fill="#fff8e8"/>
+  <ellipse cx="111" cy="77" rx="4.6" ry="3.7" fill="#614232"/>
+  <path d="M108 86q-6 4-11 0" stroke="#765039" stroke-width="2" stroke-linecap="round" fill="none"/>
+  <path d="M90 83l-9 1m9 4-8 3" stroke="#79523b" stroke-width="1.6" stroke-linecap="round" opacity=".7"/>
+  <path d="M45 88c-4 8-4 13-3 18h13l6-18z" fill="#a96a3e" stroke="#75482d" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M82 88c-2 7-2 12-1 18h13l3-17z" fill="#b87848" stroke="#75482d" stroke-width="2" stroke-linejoin="round"/>
 </svg>
