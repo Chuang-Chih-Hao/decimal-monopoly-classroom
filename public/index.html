@@ -6,11 +6,11 @@
   <meta name="theme-color" content="#f6efe5" />
   <meta name="description" content="六年級小數大富翁：5 位學生與房主同時連線，邊玩邊練習小數、折扣、比價與應用題。" />
   <title>小數富翁探險島｜六年級數學連線大富翁</title>
-  <link rel="stylesheet" href="/style.css?v=1.7.0" />
+  <link rel="stylesheet" href="/style.css?v=1.7.1" />
   <script src="/socket.io/socket.io.js" defer></script>
-  <script src="/board-layout.js?v=1.7.0" defer></script>
-  <script src="/player-colors.js?v=1.7.0" defer></script>
-  <script src="/app.js?v=1.7.0" defer></script>
+  <script src="/board-layout.js?v=1.7.1" defer></script>
+  <script src="/player-colors.js?v=1.7.1" defer></script>
+  <script src="/app.js?v=1.7.1" defer></script>
 </head>
 <body>
 <div class="app">
@@ -70,10 +70,17 @@
           <section class="panel history-panel"><h3>📣 冒險紀錄 <small>最新事件置頂</small></h3><div id="history" class="history" aria-live="polite"></div></section>
         </section>
         <aside class="side-column">
-          <section id="my-assets-panel" class="panel my-assets-panel" aria-label="我的現金與房產明細"></section><section class="panel achievement-panel" id="achievement-panel" aria-label="我的冒險成就與稱號"></section><section class="panel current-panel"><div class="side-eyebrow">NOW PLAYING <span id="turn-status" class="mini-badge">進行中</span></div><div id="current-player" class="current-player"></div><div id="turn-actions" class="turn-actions"></div></section>
+          <section id="my-assets-panel" class="panel my-assets-panel" aria-label="我的現金與房產明細"></section><section class="panel current-panel"><div class="side-eyebrow">NOW PLAYING <span id="turn-status" class="mini-badge">進行中</span></div><div id="current-player" class="current-player"></div><div id="turn-actions" class="turn-actions"></div></section>
           <section id="duel-panel" class="panel duel-panel" hidden></section><section id="question-panel" class="panel question-panel" hidden></section>
           <section id="result-panel" class="panel result-panel" hidden></section>
           <section class="panel ranking-panel"><div class="ranking-header"><h3>🏆 財富排行榜</h3><small>總資產與冒險家稱號</small></div><div id="scoreboard"></div></section>
+          <details id="achievement-panel" class="panel achievement-panel" aria-label="我的冒險成就與稱號">
+            <summary class="achievement-summary">
+              <span class="achievement-summary-title">🏅 我的冒險成就 <span id="achievement-progress" class="achievement-progress">0 / 8</span></span>
+              <span class="achievement-summary-meta"><span id="achievement-current-title">目前稱號：尚未解鎖</span><span class="achievement-summary-toggle" aria-hidden="true"></span></span>
+            </summary>
+            <div id="achievement-content" class="achievement-content"></div>
+          </details>
           <section id="teacher-panel" class="panel teacher-panel" hidden><div class="side-eyebrow">👑 房主控制台</div><p>學生無法操作時，可略過題目或雙人小遊戲；無限輪只取消輪數上限，仍會依設定時間結算，也可隨時手動結束。</p><div class="teacher-actions"><button id="skip-btn" class="btn outline small">⏭️ 略過目前回合</button><button id="finish-btn" class="btn warning small">結束並結算</button></div></section>
         </aside>
       </div>

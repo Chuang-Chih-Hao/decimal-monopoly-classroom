@@ -234,3 +234,32 @@ test('v1.7 成就面板和結算徽章存在，稱號可以從已解鎖的成就
   assert.ok(app.includes('rank-title'));
   assert.match(css,/\.achievement-grid\s*\{/);
 });
+
+// v1.7.1：修正成就面板擋住骰子／答題操作的右側佈局。
+test('v1.7.1 右側依序顯示資產、擲骰答題、排行榜，最後才是收合成就',()=>{
+  const sidebar=index.slice(index.indexOf('<aside class="side-column">'),index.indexOf('</aside>'));
+  const selectors=['id="my-assets-panel"','class="panel current-panel"','id="duel-panel"','id="question-panel"',
+    'id="result-panel"','class="panel ranking-panel"','id="achievement-panel"','id="teacher-panel"'];
+  const positions=selectors.map(name=>sidebar.indexOf(name));
+  assert.ok(positions.every((pos,i)=>pos>=0&&(i===0||pos>positions[i-1])),
+    '骰子、答題與排行榜必須排在成就面板之前');
+  assert.match(sidebar,/<details id="achievement-panel"[^>]*>/);
+  assert.doesNotMatch(sidebar,/<details id="achievement-panel"[^>]*\sopen(?:\s|=|>)/);
+  assert.ok(sidebar.includes('<summary class="achievement-summary">'));
+  assert.ok(sidebar.includes('id="achievement-progress"'));
+  assert.ok(sidebar.includes('id="achievement-current-title"'));
+});
+
+test('v1.7.1 成就面板更新時保留使用者展開狀態與原有稱號切換',()=>{
+  const style=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
+  const part=app.slice(app.indexOf('function renderAchievements(){'),app.indexOf('function renderEndAchievements(){'));
+  assert.ok(part.includes("const panel=$('achievement-panel'),content=$('achievement-content')"));
+  assert.ok(part.includes('content.innerHTML='),'僅重建成就內容');
+  assert.ok(part.includes('progress.textContent='));
+  assert.ok(part.includes('currentTitle.textContent='));
+  assert.doesNotMatch(part,/panel\.innerHTML\s*=/,'不得重建 details 元素');
+  assert.doesNotMatch(part,/panel\.open\s*=/,'狀態更新不能強制切換展開');
+  assert.ok(part.includes("request('equipTitle',{achievementId}"));
+  assert.match(style,/\.achievement-panel:not\(\[open\]\) \.achievement-summary-toggle::after/);
+  assert.match(style,/\.achievement-panel\[open\] \.achievement-summary-toggle::after/);
+});

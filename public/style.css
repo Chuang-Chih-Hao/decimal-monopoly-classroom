@@ -562,3 +562,23 @@
 .end-badge{display:inline-block;padding:7px 10px;background:#fff;border:1px solid #e9dab1;border-radius:99px;font-size:12px;font-weight:850}
 @media(max-width:480px){.story-choices{grid-template-columns:1fr}.story-choice{min-height:114px}.achievement-grid{gap:6px}.achievement-card{padding:9px 5px}}
 @media(prefers-reduced-motion:reduce){.story-choice{transition:none!important}}
+
+
+/* v1.7.1：讓回合／答題保持在排行榜上方，成就移到排行榜後並預設收合。
+   Native details preserves user toggle preference across Socket.IO state redraws. */
+.achievement-panel{padding:0;overflow:hidden}
+.achievement-summary{display:grid;gap:5px;list-style:none;padding:12px 15px;cursor:pointer;user-select:none;color:#304e43}
+.achievement-summary::-webkit-details-marker{display:none}
+.achievement-summary::marker{content:''}
+.achievement-summary:focus-visible{outline:3px solid #65a895;outline-offset:-3px;border-radius:15px}
+.achievement-summary-title{display:flex;align-items:center;justify-content:space-between;gap:9px;font-size:14px;font-weight:900;line-height:1.5}
+.achievement-progress{flex:none;border-radius:99px;background:#edf6e7;color:#547553;padding:3px 9px;font-size:11px;white-space:nowrap}
+.achievement-summary-meta{display:flex;align-items:center;justify-content:space-between;gap:6px;color:#607468;font-size:11px;line-height:1.5}
+#achievement-current-title{min-width:0;overflow-wrap:anywhere}
+.achievement-summary-toggle{flex:none;font-weight:800;color:#4a7d6e}
+.achievement-panel:not([open]) .achievement-summary-toggle::after{content:'展開 ▾'}
+.achievement-panel[open] .achievement-summary-toggle::after{content:'收合 ▴'}
+.achievement-panel[open] .achievement-summary{border-bottom:1px solid #e1eadc}
+.achievement-content{padding:0 14px 14px}
+.achievement-content .achievement-current{margin:11px 0}
+@media(max-width:480px){.achievement-summary{padding:11px 12px}.achievement-summary-meta{font-size:10px}.achievement-content{padding:0 11px 12px}}

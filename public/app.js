@@ -1,7 +1,7 @@
 /* 小數富翁前端：所有資產、擲骰、判分都以伺服器狀態為準。 */
 (() => {
   'use strict';
-  const CLIENT_VERSION='1.7.0';
+  const CLIENT_VERSION='1.7.1';
   const socket=io({transports:['websocket','polling'],reconnection:true});
   const $=id=>document.getElementById(id);
   const esc=(value)=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -781,20 +781,23 @@
     $('history').innerHTML=state.log.map((l,i)=>`<div class="log-line${i===0?' latest':''}${i===0&&newEntry?' just-added':''}"><time>${new Date(l.at).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}</time>${esc(l.text)}</div>`).join('');
   }
   function renderAchievements(){
-    const panel=$('achievement-panel'),mePlayer=myPlayer();
-    if(!panel||!mePlayer)return;
+    const panel=$('achievement-panel'),content=$('achievement-content'),mePlayer=myPlayer();
+    const progress=$('achievement-progress'),currentTitle=$('achievement-current-title');
+    if(!panel||!content||!progress||!currentTitle||!mePlayer)return;
     const catalog=state.achievementCatalog||[];
     const earned=new Set(mePlayer.achievements||[]);
     const title=badgeFor(mePlayer.titleId);
     const poll=state.mySpectatorScore;
-    panel.innerHTML=`<div class="achievement-heading"><div><span class="overline">ADVENTURER BADGES</span><h3>🏅 我的冒險成就</h3></div><span>${earned.size} / ${catalog.length}</span></div>
-      <p class="achievement-current">目前稱號：<strong>${title?esc(title.icon+' '+title.title):'尚未解鎖'}</strong> · 👀 觀戰猜對 ${poll?.correct||0} / ${poll?.attempted||0} 題</p>
+    // Keep the native <details> element intact so redraws never reopen the panel.
+    progress.textContent=`${earned.size} / ${catalog.length}`;
+    currentTitle.textContent=title?`目前稱號：${title.icon} ${title.title}`:'目前稱號：尚未解鎖';
+    content.innerHTML=`<p class="achievement-current">👀 觀戰猜對 ${poll?.correct||0} / ${poll?.attempted||0} 題</p>
       <div class="achievement-grid">${catalog.map(a=>{
         const unlocked=earned.has(a.id);
         const selected=mePlayer.titleId===a.id;
         return `<div class="achievement-card${unlocked?' unlocked':' locked'}"><div class="achievement-icon">${unlocked?esc(a.icon):'🔒'}</div><strong>${esc(a.title)}</strong><small>${esc(a.description)}</small>${unlocked?`<button type="button" class="achievement-equip" data-title-id="${esc(a.id)}" ${selected?'disabled':''}>${selected?'已裝備':'設為稱號'}</button>`:'<span class="achievement-pending">待解鎖</span>'}</div>`;
       }).join('')}</div>`;
-    panel.querySelectorAll('[data-title-id]').forEach(btn=>btn.addEventListener('click',()=>{
+    content.querySelectorAll('[data-title-id]').forEach(btn=>btn.addEventListener('click',()=>{
       const achievementId=btn.dataset.titleId;
       btn.disabled=true;
       request('equipTitle',{achievementId},ok=>{if(!ok)renderAchievements();});
