@@ -91,3 +91,26 @@ test('學生與房主皆可見同一區塊，且不在房主專用的隱藏表�
   assert.ok(app.includes('checkClientVersion'));
   assert.ok(app.includes("'/api/client-version'"));
 });
+
+// v1.6.1：正式棋子沿用 v1.5 動物圖示，移動時才暫時放大並快速跳格。
+test('動物移動不使用旗子對話框，跳完恢復原本格子圖示',()=>{
+  const style=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
+  assert.ok(app.includes('const animalHtml=a=>a==='),'靜態動物應直接顯示圖示');
+  assert.ok(!app.includes('animal-flag'),'前端不應再有旗面或旗桿元件');
+  assert.ok(!style.includes('.animal-flag'),'樣式檔不應再有立體旗子樣式');
+  assert.ok(app.includes('moving-pawn moving-animal position-instant'));
+  assert.ok(app.includes('moving-animal-sprite'));
+  assert.ok(app.includes('sprite.classList.add(\'is-hopping\')'));
+  assert.ok(app.includes('locate((roll.from+step)%state.board.length)'));
+  assert.ok(app.includes('activeRollAnimation=null;\n    renderBoard()'),'動畫結束後應繪製靜態動物');
+  assert.match(style,/\.board \.moving-pawn\.moving-animal\s*\{/);
+  assert.match(style,/@keyframes animal-hop/);
+  assert.match(style,/background:transparent;box-shadow:none/);
+});
+
+test('防快取版本與套件版本一致',()=>{
+  const version=require('../package.json').version;
+  assert.ok(index.includes(`/app.js?v=${version}`));
+  assert.ok(index.includes(`/style.css?v=${version}`));
+  assert.ok(app.includes(`const CLIENT_VERSION='${version}'`));
+});

@@ -1,19 +1,15 @@
 /* 小數富翁前端：所有資產、擲骰、判分都以伺服器狀態為準。 */
 (() => {
   'use strict';
-  const CLIENT_VERSION='1.6.0';
+  const CLIENT_VERSION='1.6.1';
   const socket=io({transports:['websocket','polling'],reconnection:true});
   const $=id=>document.getElementById(id);
   const esc=(value)=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const money=n=>`$${Number(n||0).toLocaleString('zh-TW')}`;
   const animals=['capybara','🐈','🐕','🐰','🦊','🐼','🐸','🐧','🦁','🐻','🐹','🐨'];
   const animalNames=['水豚','貓','狗','兔子','狐狸','貓熊','青蛙','企鵝','獅子','熊','倉鼠','無尾熊'];
-  const animalIconHtml=a=>a==='capybara'?'<img class="animal-img" src="/capybara.svg" alt="水豚" />':esc(a);
-  function animalHtml(a,variant='flag'){
-    const icon=animalIconHtml(a);
-    if(variant==='icon')return `<span class="animal-icon">${icon}</span>`;
-    return `<span class="animal-flag animal-flag--${variant}" aria-hidden="true"><span class="animal-flag__cloth"><span class="animal-flag__icon">${icon}</span></span><span class="animal-flag__pole"></span><span class="animal-flag__base"></span></span>`;
-  }
+  // 停在格子時採用 v1.5 原始動物圖示；只有移動過程放大成跳躍動物。
+  const animalHtml=a=>a==='capybara'?'<img class="animal-img" src="/capybara.svg" alt="水豚" />':esc(a);
   const diceIcons=['','⚀','⚁','⚂','⚃','⚄','⚅'];
   const layout=window.DecimalBoardLayout;
   const playerColors=window.DecimalPlayerColors;
@@ -149,7 +145,7 @@
       btn.title=animalNames[i];btn.setAttribute('aria-label',animalNames[i]);btn.setAttribute('aria-pressed',String(a===selectedAnimal));
       const paint=playerColors.forAnimal(a);
       btn.style.cssText=`--player-color:${paint.hex};--player-light:${paint.light}`;
-      btn.innerHTML=`<span class="animal-option-icon">${animalHtml(a,'icon')}</span><span class="animal-color-dot" aria-hidden="true"></span>`;
+      btn.innerHTML=`<span class="animal-option-icon">${animalHtml(a)}</span><span class="animal-color-dot" aria-hidden="true"></span>`;
       btn.title=`${animalNames[i]}｜${paint.name}`;
       btn.addEventListener('click',()=>{selectedAnimal=a;renderAnimalPicker();});picker.appendChild(btn);
     });
@@ -311,7 +307,7 @@
     $('room-code-label').textContent=state.code;
     $('lobby-big-code').textContent=state.code;
     $('game-status-label').textContent=({lobby:'等待加入',playing:'遊戲進行中',finished:'已完成'})[state.status];
-    $('whoami').innerHTML=`<span class="identity-chip" style="${colorStyle(myPlayer())}">${animalHtml(myPlayer()?.animal,'hero')} ${esc(myPlayer()?.name)} <small>${colorFor(myPlayer()).name}</small>${isHost()?' 👑':''}</span>`;
+    $('whoami').innerHTML=`<span class="identity-chip" style="${colorStyle(myPlayer())}">${animalHtml(myPlayer()?.animal)} ${esc(myPlayer()?.name)} <small>${colorFor(myPlayer()).name}</small>${isHost()?' 👑':''}</span>`;
     $('lobby-screen').hidden=state.status!=='lobby';
     $('playing-screen').hidden=state.status!=='playing';
     $('end-screen').hidden=state.status!=='finished';
@@ -325,7 +321,7 @@
       const p=state.players[i];const div=document.createElement('div');div.className='lobby-slot'+(p?'':' empty');
       if(p)div.style.cssText=colorStyle(p);
       div.innerHTML=p
-        ? `<div class="lobby-animal">${animalHtml(p.animal,'hero')}</div><div><div class="lobby-name">${esc(p.name)}${p.id===me?'（我）':''}</div><div class="lobby-meta">${colorFor(p).name}棋子 · ${p.host?'👑 房主':'冒險家'} · ${p.connected?'已連線':'暫時離線'}</div></div>`
+        ? `<div class="lobby-animal">${animalHtml(p.animal)}</div><div><div class="lobby-name">${esc(p.name)}${p.id===me?'（我）':''}</div><div class="lobby-meta">${colorFor(p).name}棋子 · ${p.host?'👑 房主':'冒險家'} · ${p.connected?'已連線':'暫時離線'}</div></div>`
         :`<div class="lobby-animal">➕</div><div><div class="lobby-name">等待加入</div><div class="lobby-meta">冒險席位 ${i+1}</div></div>`;
       list.appendChild(div);
     }
@@ -363,15 +359,15 @@
       el.title=tile.type==='property'?`${tile.name}：購地 ${money(tile.price)}，租金 ${money(tile.rent)}${owner?'，屋主 '+owner.name+'（'+colorFor(owner).name+'）':''}`:`${tile.name}：${tile.tip||''}`;
       el.innerHTML=`<span class="tile-number">${String(tile.id).padStart(2,'0')}</span><span class="tile-icon">${esc(tile.icon)}</span><span class="tile-name">${esc(tile.name)}</span>`
         +(tile.price?`<span class="tile-price">${money(tile.price)}</span>`:'')
-        +(owner?`<span class="owner-mini" title="${esc(owner.name)} 的房產">${animalHtml(owner.animal,'mini')}<span>${esc(owner.name)}</span></span>`:'')
-        +`<div class="tile-pawns">${pawns.map(p=>`<span class="pawn${p.id===state.currentPlayerId?' pawn-current':''}" style="${colorStyle(p)}" title="${esc(p.name)}・${colorFor(p).name}">${animalHtml(p.animal,'mini')}</span>`).join('')}</div>`;
+        +(owner?`<span class="owner-mini" title="${esc(owner.name)} 的房產">${animalHtml(owner.animal)}<span>${esc(owner.name)}</span></span>`:'')
+        +`<div class="tile-pawns">${pawns.map(p=>`<span class="pawn${p.id===state.currentPlayerId?' pawn-current':''}" style="${colorStyle(p)}" title="${esc(p.name)}・${colorFor(p).name}">${animalHtml(p.animal)}</span>`).join('')}</div>`;
       board.appendChild(el);
     });
     const center=document.createElement('div');center.id='board-center';center.className='board-center';
     const last=state.lastRoll,who=last?state.players.find(p=>p.id===last.playerId):null;
     const current=activePlayer();
     const description=last?`${esc(who?.name||'玩家')} 擲出 ${last.die} 點！`:'30 格經典方格棋盤';
-    center.innerHTML=`<div class="center-content"><div class="center-logo">🌴 💰 🎲</div><div class="center-title">小數富翁<br/>探險島</div><div class="center-desc">${description}<br/>買店面・算折扣・雙人對戰</div><div class="center-turn" style="${colorStyle(current)}">${animalHtml(current?.animal||'🐾','hero')} 現在輪到 ${esc(current?.name||'冒險家')}</div>${last?`<span class="dice-face" aria-label="${last.die} 點">${diceIcons[last.die]}</span>`:''}</div>`;
+    center.innerHTML=`<div class="center-content"><div class="center-logo">🌴 💰 🎲</div><div class="center-title">小數富翁<br/>探險島</div><div class="center-desc">${description}<br/>買店面・算折扣・雙人對戰</div><div class="center-turn" style="${colorStyle(current)}">${animalHtml(current?.animal||'🐾')} 現在輪到 ${esc(current?.name||'冒險家')}</div>${last?`<span class="dice-face" aria-label="${last.die} 點">${diceIcons[last.die]}</span>`:''}</div>`;
     board.appendChild(center);
     const focusKey=state.currentPlayerId;
     if(mapFocusKey!==focusKey){
@@ -429,34 +425,52 @@
     await sleep(reducedMotion?330:650);
     if(!valid())return;
     stage.remove();
+    // 只在擲骰前進時，將動物從原本的小圖示放大為逐格跳躍的角色。
     const mover=document.createElement('div');
-    mover.className='moving-pawn';
-    mover.innerHTML=animalHtml(player?.animal||'🐾','hero');
+    mover.className='moving-pawn moving-animal position-instant';
+    mover.innerHTML=`<span class="moving-animal-art"><span class="moving-animal-sprite">${animalHtml(player?.animal||'🐾')}</span></span><span class="moving-animal-shadow" aria-hidden="true"></span>`;
     mover.style.cssText=colorStyle(player);
-    mover.setAttribute('aria-label',`${playerName} 正在前進`);
+    mover.setAttribute('role','img');
+    mover.setAttribute('aria-label',`${playerName} 的動物正在逐格跳躍`);
     board.appendChild(mover);
+    const sprite=mover.querySelector('.moving-animal-sprite');
+    const duration=reducedMotion?65:215;
+    mover.style.setProperty('--animal-step-duration',`${duration}ms`);
     const locate=id=>{
       const tile=board.querySelector(`[data-tile-id="${id}"]`);
       if(!tile)return;
+      const oldX=Number.parseFloat(mover.style.left);
+      const x=Number.parseFloat(tile.style.left);
+      if(Number.isFinite(oldX)&&oldX!==x)mover.classList.toggle('facing-left',x<oldX);
       board.querySelectorAll('.tile-move-target').forEach(x=>x.classList.remove('tile-move-target'));
       tile.classList.add('tile-move-target');
       focusMapTile(id);
-      // 以棋盤座標而不是視窗座標定位，縮放螢幕仍能逐格移動。
+      // 移動座標仍由伺服器計算的骰子結果決定，不改動實際落點。
       mover.style.left=tile.style.left;
       mover.style.top=tile.style.top;
     };
-    mover.classList.add('position-instant');
     locate(roll.from);
+    // 動物先出現在原格，再開始跳，避免從左上角飛進棋盤。
     await sleep(40);
+    if(!valid())return;
     mover.classList.remove('position-instant');
     for(let step=1;step<=roll.die;step++){
       if(!valid())return;
       locate((roll.from+step)%state.board.length);
-      await sleep(reducedMotion?90:260);
+      // 每格重播單次跳躍；例如骰出 4 點，動物就跳 4 格。
+      if(!reducedMotion){
+        sprite.classList.remove('is-hopping');
+        void sprite.offsetWidth;
+        sprite.classList.add('is-hopping');
+      }
+      await sleep(duration+20);
     }
     if(!valid())return;
-    await sleep(reducedMotion?100:340);
+    sprite.classList.remove('is-hopping');
+    mover.classList.add('is-landing');
+    await sleep(reducedMotion?70:180);
     if(!valid())return;
+    // 抵達後重新畫棋盤：動物會恢復成 v1.5 的小棋子圖示。
     activeRollAnimation=null;
     renderBoard();renderTurnActions();renderQuestion();renderDuel();
     focusMapTile(roll.position);
@@ -484,7 +498,7 @@
     $('turn-status').textContent=isMyTurn()?'換你啦！':'等待中';
     const current=activePlayer();
     $('current-player').innerHTML=current
-      ?`<div class="current-identity" style="${colorStyle(current)}"><div class="active-animal">${animalHtml(current.animal,'hero')}</div><div><div class="active-name">${esc(current.name)}${isMyTurn()?' ✨':''}</div><div class="active-sub"><span class="person-color-dot"></span>${colorFor(current).name}棋子 · 現金 ${money(current.cash)} · ${current.properties.length} 處房產</div></div></div>`:'';
+      ?`<div class="current-identity" style="${colorStyle(current)}"><div class="active-animal">${animalHtml(current.animal)}</div><div><div class="active-name">${esc(current.name)}${isMyTurn()?' ✨':''}</div><div class="active-sub"><span class="person-color-dot"></span>${colorFor(current).name}棋子 · 現金 ${money(current.cash)} · ${current.properties.length} 處房產</div></div></div>`:'';
     if(!activeRollAnimation?.started)renderBoard();
     renderTurnActions();renderQuestion();renderDuel();renderResult();renderMyAssets();renderScoreboard();renderLog();
     $('teacher-panel').hidden=!isHost();
@@ -526,7 +540,7 @@
       :'雙方各選一根手指。若選到相同手指，由本回合「喊口令」的攻擊方獲勝；不同就交換攻守，最多 4 回合。';
     const prev=d.lastExchange?`<div class="duel-last">上一回合：${esc(options[d.lastExchange.renterChoice]?.[1])} vs ${esc(options[d.lastExchange.ownerChoice]?.[1])}，${d.mode==='rps'?'平手！':'手指不同，交換攻守！'}</div>`:'';
     panel.innerHTML=`<div class="question-tag">⚔️ 抵達他人房產 · 過路費已先結算</div><h3>${title} <small>第 ${d.round}/${d.maxRounds} 回合</small></h3>
-      <p class="duel-how">${how}</p><div class="duel-vs"><div>${animalHtml(renter?.animal,'hero')} <strong>${esc(renter?.name||'租客')}</strong><small>租客 ${d.ready?.renter?'✓ 已出招':'等待出招'}</small></div><b>VS</b><div>${animalHtml(owner?.animal,'hero')} <strong>${esc(owner?.name||'屋主')}</strong><small>屋主 ${d.ready?.owner?'✓ 已出招':'等待出招'}</small></div></div>
+      <p class="duel-how">${how}</p><div class="duel-vs"><div>${animalHtml(renter?.animal)} <strong>${esc(renter?.name||'租客')}</strong><small>租客 ${d.ready?.renter?'✓ 已出招':'等待出招'}</small></div><b>VS</b><div>${animalHtml(owner?.animal)} <strong>${esc(owner?.name||'屋主')}</strong><small>屋主 ${d.ready?.owner?'✓ 已出招':'等待出招'}</small></div></div>
       <div class="duel-stake">💰 輸家額外補貼最多 ${money(d.stake)} 給贏家（現金不足只付現有金額）；平手不付。</div>
       ${d.mode==='turtle'?`<div class="duel-attacker">📣 本回合喊「烏龜烏龜翹」的是：<strong>${esc(attacker?.name||'屋主')}</strong></div>`:''}
       ${prev}<div class="duel-timer" id="duel-timer"></div>
@@ -596,7 +610,7 @@
     el.hidden=false;
     const paint=colorFor(p),assetValue=landValue(p);
     const properties=p.properties.map(id=>state.board[id]).filter(Boolean).sort((a,b)=>a.id-b.id);
-    el.innerHTML=`<div class="assets-header" style="${colorStyle(p)}"><span class="assets-title">💼 我的資產</span><span class="my-identity">${animalHtml(p.animal,'hero')} ${esc(p.name)} · ${paint.name}</span></div>
+    el.innerHTML=`<div class="assets-header" style="${colorStyle(p)}"><span class="assets-title">💼 我的資產</span><span class="my-identity">${animalHtml(p.animal)} ${esc(p.name)} · ${paint.name}</span></div>
       <div class="asset-totals" style="${colorStyle(p)}"><div class="asset-metric"><span>💵 現金餘額</span><strong>${money(p.cash)}</strong></div><div class="asset-metric"><span>🏠 房產總值</span><strong>${money(assetValue)}</strong></div><div class="asset-metric asset-sum"><span>💰 總資產</span><strong>${money(wealth(p))}</strong></div></div>
       <div class="assets-land-heading">🏡 我的房產（${properties.length} 處）<small>點選可定位到棋盤</small></div>
       <div class="assets-property-list">${properties.length?properties.map(tile=>`<button type="button" class="asset-property" style="${colorStyle(p)}" data-asset-tile="${tile.id}" title="聚焦到 ${esc(tile.name)}"><span class="asset-property-name">${esc(tile.icon)} ${esc(tile.name)}</span><span>價值 ${money(tile.price)} · 租金 ${money(tile.rent)}</span></button>`).join(''):'<span class="assets-empty">還沒有房產。答對購地題後就能購買，土地會以你的代表色標示。</span>'}</div>`;
@@ -610,7 +624,7 @@
   function renderScoreboard(){
     const el=$('scoreboard');
     const ranking=[...state.players].sort((a,b)=>wealth(b)-wealth(a)||b.correct-a.correct);
-    el.innerHTML=ranking.map((p,i)=>`<div class="score-row${p.id===me?' me':''}" style="${colorStyle(p)}"><div class="score-place">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div><div class="score-avatar">${animalHtml(p.animal,'hero')}</div><div class="score-content"><div class="score-name"><span class="person-color-dot"></span>${esc(p.name)} <small>${colorFor(p).name}</small>${p.host?' 👑':''}${!p.connected?' 🔌':''}${p.id===me?'（我）':''}</div><div class="score-detail">💵 現金 <b>${money(p.cash)}</b>　🏠 房產 <b>${money(landValue(p))}</b>（${p.properties.length} 處）</div><div class="score-detail">答對 ${p.correct}/${p.attempted} 題</div></div><div class="score-money"><small>總資產</small><strong>${money(wealth(p))}</strong></div></div>`).join('');
+    el.innerHTML=ranking.map((p,i)=>`<div class="score-row${p.id===me?' me':''}" style="${colorStyle(p)}"><div class="score-place">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div><div class="score-avatar">${animalHtml(p.animal)}</div><div class="score-content"><div class="score-name"><span class="person-color-dot"></span>${esc(p.name)} <small>${colorFor(p).name}</small>${p.host?' 👑':''}${!p.connected?' 🔌':''}${p.id===me?'（我）':''}</div><div class="score-detail">💵 現金 <b>${money(p.cash)}</b>　🏠 房產 <b>${money(landValue(p))}</b>（${p.properties.length} 處）</div><div class="score-detail">答對 ${p.correct}/${p.attempted} 題</div></div><div class="score-money"><small>總資產</small><strong>${money(wealth(p))}</strong></div></div>`).join('');
   }
   function renderLog(){
     const current=state.log?.[0]?.id;
@@ -632,7 +646,7 @@
     const typeRows=allRows.length?allRows.map(item=>`<div class="feedback-skill-row"><span>${esc(item.name)}</span><span>${item.correct} / ${item.attempted} 題</span><strong class="${item.wrong?'need-review':'all-correct'}">${percent(item.accuracy)}</strong></div>`).join(''):'<p class="feedback-note">本局尚無可統計的題目。</p>';
     const examples=mine.examples.map(item=>`<details class="feedback-example"><summary><span class="feedback-example-type">${esc(item.skillName)}</span>${esc(item.question)}${item.timedOut?' <small>（逾時）</small>':''}</summary><div class="feedback-example-solution"><strong>正確答案：${esc(item.answer)}</strong><p>${esc(item.explanation)}</p></div></details>`).join('');
     const classRows=group?.bySkill?.length?group.bySkill.slice(0,5).map(item=>`<div class="feedback-skill-row"><span>${esc(item.name)}</span><span>全班答錯 ${item.wrong}/${item.attempted} 題</span><strong>${percent(item.accuracy)}</strong></div>`).join(''):'<p class="feedback-note">這局沒有全班答題資料。</p>';
-    el.innerHTML=`<div class="feedback-heading"><div><span class="overline">PERSONAL LEARNING REPORT</span><h3>🧠 我的數學學習回饋</h3></div><div class="feedback-overall" style="${colorStyle(myPlayer())}">${animalHtml(myPlayer()?.animal,'hero')} <strong>${mine.correct} / ${mine.attempted}</strong><small>答對題數 · 正確率 ${percent(mine.accuracy)}</small></div></div>
+    el.innerHTML=`<div class="feedback-heading"><div><span class="overline">PERSONAL LEARNING REPORT</span><h3>🧠 我的數學學習回饋</h3></div><div class="feedback-overall" style="${colorStyle(myPlayer())}">${animalHtml(myPlayer()?.animal)} <strong>${mine.correct} / ${mine.attempted}</strong><small>答對題數 · 正確率 ${percent(mine.accuracy)}</small></div></div>
       <p class="feedback-intro">${esc(intro)}</p>
       ${mine.timedOut?`<p class="feedback-note">⏱️ 有 ${mine.timedOut} 題因時間到而記為未答對，請搭配作答時間看結果。</p>`:''}
       ${weakHtml}<h4>📊 各種題型作答統計</h4><div class="feedback-skill-list">${typeRows}</div>
@@ -661,11 +675,11 @@
     const entries=state.hostReflections||[];
     const completed=entries.filter(item=>item.reflection).length;
     $('reflection-list').innerHTML=`<p class="reflection-status">已收到 ${completed} / ${entries.length} 位玩家的回饋（房主也可填寫）。</p>`+entries.map(item=>
-      `<article class="reflection-entry" style="${colorStyle(item)}"><div class="reflection-entry-head">${animalHtml(item.animal,'hero')} <strong>${esc(item.name)}${item.id===me?'（我）':''}</strong> <span>${item.reflection?'✅ 已填寫':'⏳ 尚未填寫'}</span></div>${item.reflection?`<p>${esc(item.reflection.text)}</p>`:''}</article>`
+      `<article class="reflection-entry" style="${colorStyle(item)}"><div class="reflection-entry-head">${animalHtml(item.animal)} <strong>${esc(item.name)}${item.id===me?'（我）':''}</strong> <span>${item.reflection?'✅ 已填寫':'⏳ 尚未填寫'}</span></div>${item.reflection?`<p>${esc(item.reflection.text)}</p>`:''}</article>`
     ).join('');
   }
   function renderEnd(){
-    $('end-rankings').innerHTML=state.rankings.map((r,i)=>`<div class="end-row" style="${colorStyle(r)}"><strong>${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</strong><span class="avatar">${animalHtml(r.animal,'hero')}</span><div><strong><span class="person-color-dot"></span>${esc(r.name)}（${colorFor(r).name}）</strong><div class="end-stats">現金 ${money(r.cash)} ＋ 房產 ${money(r.landValue)} · 答對 ${r.correct}/${r.attempted}</div></div><div class="end-amount">${money(r.score)}</div></div>`).join('');
+    $('end-rankings').innerHTML=state.rankings.map((r,i)=>`<div class="end-row" style="${colorStyle(r)}"><strong>${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</strong><span class="avatar">${animalHtml(r.animal)}</span><div><strong><span class="person-color-dot"></span>${esc(r.name)}（${colorFor(r).name}）</strong><div class="end-stats">現金 ${money(r.cash)} ＋ 房產 ${money(r.landValue)} · 答對 ${r.correct}/${r.attempted}</div></div><div class="end-amount">${money(r.score)}</div></div>`).join('');
     renderLearningFeedback();
     renderWrittenReflection();
     $('restart-btn').hidden=!isHost();
