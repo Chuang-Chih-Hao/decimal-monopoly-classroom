@@ -178,3 +178,12 @@ MIT License，水豚 SVG 為本專案原創繪製。
 ### 更新時注意
 
 更新檔案 ZIP 需按原路徑覆蓋到 GitHub 的 `main` 分支；這次核心修改包括 `game.js`、`server.js`、`public/app.js`、`public/index.html`、`public/style.css`、`package.json` 與測試／README。Render 若啟用自動部署會依 commit 重啟服務。
+
+
+## v1.5.1 等待室設定顯示修正
+
+- 四項遊戲設定的區塊移到所有玩家共用的候位區，並置於房主編輯選單前。學生（非房主）也應看到輪數、起始金額、答題時間、課堂時間。
+- 房主修改設定後，透過 Socket.IO 廣播 `state.settings`，學生重新渲染四張設定卡。
+- HTML、JS、CSS 設為 `Cache-Control: no-store`，前端檔案附版本號，降低舊版快取造成的畫面不一致。新版客戶端每分鐘及切回視窗時檢查部署版本：等待室可自動重載，遊玩中只顯示更新提示。
+- **舊版已開啟的分頁**不具備版本偵測功能。首次升級 v1.5.1 時，請學生按 F5 或手機重新整理頁面，房間資訊會透過既有儲存的權杖恢復。
+- 更新 GitHub 後，Render 必須先部署到新版本；否則學生重整仍只會看到舊版。

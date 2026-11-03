@@ -1,6 +1,7 @@
 /* 小數富翁前端：所有資產、擲骰、判分都以伺服器狀態為準。 */
 (() => {
   'use strict';
+  const CLIENT_VERSION='1.5.1';
   const socket=io({transports:['websocket','polling'],reconnection:true});
   const $=id=>document.getElementById(id);
   const esc=(value)=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -30,6 +31,27 @@
   let reflectionDirty=false;
   const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
   const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+  // 新版部署後，舊分頁不會自動取得新的 HTML：登入或重新開啟分頁時檢查版本。
+  // 等待室可安全重載；進行中則讓學生自行選擇，避免突然中斷答題。
+  let checkingVersion=false;
+  async function checkClientVersion(){
+    if(checkingVersion)return;
+    checkingVersion=true;
+    try{
+      const response=await fetch('/api/client-version',{cache:'no-store'});
+      if(!response.ok)return;
+      const data=await response.json();
+      if(data.version&&data.version!==CLIENT_VERSION){
+        if(state?.status==='playing'){
+          $('update-banner').hidden=false;
+          $('update-banner-info').textContent='遊戲已更新，可在這回合結束後重新整理。';
+        }else{
+          // localStorage 中的房間權杖會在重載後恢復，不需要學生重新加入。
+          window.location.reload();
+        }
+      }
+    }catch{}finally{checkingVersion=false;}
+  }
   let tokenData=null;
   try {tokenData=JSON.parse(localStorage.getItem('decimal-monopoly-session')||'null');}catch{tokenData=null;}
 
@@ -180,6 +202,10 @@
   const prefill=new URLSearchParams(window.location.search).get('room');
   if(prefill)$('room-code').value=prefill.trim().toUpperCase().slice(0,6);
 
+  $('update-now').addEventListener('click',()=>window.location.reload());
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)void checkClientVersion();});
+  window.setInterval(()=>{if(socket.connected)void checkClientVersion();},60_000);
+
   $('create-btn').addEventListener('click',()=>{
     const name=$('player-name').value.trim();if(!name){showToast('請先輸入冒險家暱稱。',true);return;}
     request('create',{name,animal:selectedAnimal},(ok,data)=>{if(ok){saveSession(data);setInitialState(data.state);showToast('已建立房間！把代碼傳給同學。');}});
@@ -230,6 +256,7 @@
   $('restart-btn').addEventListener('click',()=>request('reset'));
 
   socket.on('connect',()=>{
+    void checkClientVersion();
     $('connection').className='connection online';$('connection').innerHTML='<span class="status-dot"></span>已連線';
     if(tokenData){
       request('resume',{code:tokenData.code,token:tokenData.token},(ok,data)=>{

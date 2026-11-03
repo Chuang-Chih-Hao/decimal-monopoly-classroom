@@ -38,7 +38,7 @@ test('所有 12 隻動物都有唯一且固定的代表色與中文色名',()=>{
 });
 
 test('網頁會載入地圖與色票，具有聚焦、自由縮放及我的資產明細',()=>{
-  for(const src of ['/board-layout.js','/player-colors.js','/app.js'])assert.ok(index.includes(`src="${src}"`));
+  for(const src of ['/board-layout.js','/player-colors.js','/app.js'])assert.ok(index.includes(`src="${src}?v=`));
   for(const id of ['map-overview','map-zoom-in','map-zoom-out','map-zoom-label','map-fullsize','board-wrapper','my-assets-panel']) assert.ok(index.includes(`id="${id}"`),id);
   assert.ok(app.includes('focusKey=state.currentPlayerId'), '應在換人時才自動聚焦');
   assert.ok(app.includes('function renderMyAssets()'));
@@ -76,4 +76,18 @@ test('文字反思可以輸入、送出、重新編輯，房主看到全員回�
   assert.ok(app.includes('state.hostReflections'));
   assert.ok(app.includes('reflectionDirty'));
   assert.ok(app.includes('esc(item.reflection.text)'));
+});
+
+
+test('學生與房主皆可見同一區塊，且不在房主專用的隱藏表單之內',()=>{
+  const common=index.indexOf('class="lobby-settings-preview"');
+  const privateControls=index.indexOf('id="host-settings"');
+  const studentMessage=index.indexOf('id="guest-waiting"');
+  assert.ok(common>0 && privateControls>0 && studentMessage>0);
+  assert.ok(common<privateControls,'設定摘要必須在房主選單之前，避免隱藏影響學生');
+  assert.ok(studentMessage>privateControls);
+  assert.ok(index.includes('id="lobby-settings-summary"'));
+  assert.ok(index.includes('id="update-banner"'));
+  assert.ok(app.includes('checkClientVersion'));
+  assert.ok(app.includes("'/api/client-version'"));
 });

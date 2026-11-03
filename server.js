@@ -6,6 +6,7 @@ const { Server }=require('socket.io');
 const {GameManager,GameError}=require('./game');
 const {ANIMALS}=require('./board');
 const {TOTAL}=require('./questions');
+const APP_VERSION=require('./package.json').version;
 
 const app=express();
 const httpServer=http.createServer(app);
@@ -14,8 +15,15 @@ const games=new GameManager();
 app.disable('x-powered-by');
 app.get('/health',(_req,res)=>res.json({ok:true,game:'小數大富翁',questions:TOTAL}));
 app.get('/api/info',(_req,res)=>res.json({animals:ANIMALS,questions:TOTAL,maxPlayers:6}));
-app.use(express.static(path.join(__dirname,'public'),{index:'index.html',maxAge:0}));
-app.get('*',(_req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
+// 使用 no-store 確保已開啟的舊分頁能偵測新部署版本。
+app.get('/api/client-version',(_req,res)=>res.set('Cache-Control','no-store').json({version:APP_VERSION}));
+app.use(express.static(path.join(__dirname,'public'),{
+  index:'index.html',maxAge:0,etag:false,lastModified:false,
+  setHeaders(res,filePath) {
+    if(/\.(?:html|js|css)$/i.test(filePath)) res.setHeader('Cache-Control','no-store, no-cache, must-revalidate');
+  }
+}));
+app.get('*',(_req,res)=>res.set('Cache-Control','no-store').sendFile(path.join(__dirname,'public','index.html')));
 
 // 每位玩家收到自己的個人學習回饋；他人的錯題紀錄不會廣播到全房間。
 function broadcast(room) {

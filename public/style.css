@@ -318,3 +318,10 @@
 .reflection-entry p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.75;margin:8px 0 0;color:#2a3e42}
 @media(max-width:750px){.settings-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.settings-summary-item strong{font-size:16px}}
 @media(max-width:420px){.settings-summary-grid{gap:7px}.settings-summary-item{padding:10px 6px}.lobby-settings-preview{padding:12px}}
+
+/* v1.5.1：任何使用者都能看見房主設定，不受房主控制項顯示狀態影響。 */
+.lobby-settings-preview{display:block;margin:18px 0 22px;position:relative;}
+.lobby-settings-preview[hidden]{display:none;}
+.update-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:900px;margin:10px auto;padding:12px 16px;background:#fff4d5;border:1px solid #e2cc7a;border-radius:13px;font-size:14px;font-weight:750}
+.update-banner[hidden]{display:none}
+@media(max-width:520px){.update-banner{flex-direction:column;align-items:stretch}}
