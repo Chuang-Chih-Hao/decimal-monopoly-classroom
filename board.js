@@ -24,6 +24,12 @@ const BOARD = [
   { id:21,type:'boss',name:'終極 Boss',icon:'🐉',tip:'連續 2 題對決' },
   { id:22,type:'property',name:'星光電影院',icon:'🎬',price:480,rent:120,group:'金色' },
   { id:23,type:'chance',name:'機會',icon:'🍀',tip:'答題抽好運' },
+  { id:24,type:'property',name:'親子咖啡館',icon:'☕',price:310,rent:80,group:'橘黃' },
+  { id:25,type:'compare',name:'精打細算站',icon:'🛒',tip:'比較單位價格' },
+  { id:26,type:'chest',name:'森林寶箱',icon:'🗝️',tip:'解鎖小數密碼' },
+  { id:27,type:'property',name:'海洋樂園',icon:'🐬',price:420,rent:105,group:'藍色' },
+  { id:28,type:'boss',name:'逆轉大魔王',icon:'👾',tip:'終盤兩題挑戰' },
+  { id:29,type:'fate',name:'命運大轉盤',icon:'🎡',tip:'意外驚喜事件' },
 ];
 const ANIMALS = ['capybara','🐈','🐕','🐰','🦊','🐼','🐸','🐧','🦁','🐻','🐹','🐨'];
 module.exports={ BOARD, ANIMALS };

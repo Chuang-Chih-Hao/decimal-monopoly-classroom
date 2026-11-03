@@ -21,8 +21,8 @@
     <div class="intro-copy">
       <div class="eyebrow">✦ 小數應用主題教室 ✦</div>
       <h1>把小數變成你的<br/><em>致富超能力！</em></h1>
-      <p>擲骰前進、算折扣、拆穿黑心商人，搶購店面挑戰最終 Boss。<br/>每一格都藏著新的數學冒險！</p>
-      <div class="feature-tags"><span>🧮 小數四則</span><span>🏷️ 折扣比價</span><span>🏠 買地收租</span><span>🐉 兩題 Boss</span></div>
+      <p>擲骰前進、算折扣、拆穿黑心商人，搶購店面挑戰最終 Boss。<br/>30 格彎曲賽道、雙人快速對決，每一格都藏著新的數學冒險！</p>
+      <div class="feature-tags"><span>🧮 小數四則</span><span>🏷️ 折扣比價</span><span>🏠 買地收租</span><span>⚔️ 猜拳／烏龜烏龜翹</span><span>🐉 兩題 Boss</span></div>
       <div class="entry-decoration">🐈 <span>🦫</span> 🐼</div>
     </div>
     <div class="entry-form panel">
@@ -50,7 +50,7 @@
       <div class="lobby-head"><div><span class="overline">等大家到齊！</span><h2>冒險家集合！</h2><p>把房間代碼分享給同學，每人選一隻自己的動物。</p></div><div class="lobby-code" id="lobby-big-code">------</div></div>
       <div id="lobby-slots" class="lobby-slots"></div>
       <div id="host-settings" class="host-settings" hidden>
-        <div class="setting-grid"><label>遊戲輪數<select id="round-select"><option value="4">4 輪｜短時間</option><option value="6">6 輪</option><option value="8" selected>8 輪｜推薦</option><option value="10">10 輪</option><option value="12">12 輪</option></select></label><label>每人起始金額<select id="money-select"><option value="600">$600｜挑戰</option><option value="900" selected>$900｜標準</option><option value="1200">$1200｜寬裕</option></select></label></div>
+        <div class="setting-grid"><label>遊戲輪數<select id="round-select"><option value="2">2 輪｜短場</option><option value="3">3 輪｜短場</option><option value="4">4 輪</option><option value="5">5 輪</option><option value="6">6 輪</option><option value="8">8 輪</option><option value="10">10 輪</option><option value="12" selected>12 輪｜30 分鐘上限</option></select></label><label>每人起始金額<select id="money-select"><option value="600">$600｜挑戰</option><option value="900" selected>$900｜標準</option><option value="1200">$1200｜寬裕</option></select></label><label>每題作答時間<select id="question-time-select"><option value="90">90 秒</option><option value="120" selected>120 秒｜推薦</option><option value="150">150 秒</option><option value="180">180 秒｜需要更多時間</option></select></label><label>課堂遊玩時間<select id="duration-select"><option value="20">20 分鐘｜短場</option><option value="30" selected>30 分鐘｜推薦</option><option value="40">40 分鐘｜長場</option></select></label></div><p class="settings-note">⏱️ 預設每題 2 分鐘；到達總時間上限時，會先完成當前題目或對戰，再結算排名。實際結束時間可能略晚。</p>
         <button id="start-btn" class="btn primary host-start">🚀 所有人就位，開始遊戲！</button>
       </div>
       <div id="guest-waiting" class="guest-waiting" hidden>⏳ 等待房主開始遊戲…</div>
@@ -60,17 +60,17 @@
     <section id="playing-screen" hidden>
       <div class="play-grid">
         <section class="board-column">
-          <div class="section-head"><div><span class="overline">DECIMAL ISLAND</span><h2>小數富翁地圖</h2></div><div id="round-chip" class="round-chip">第 1 / 8 輪</div></div>
-          <div class="board-wrapper"><div id="board" class="board" aria-label="大富翁遊戲棋盤"><div id="board-center" class="board-center"></div></div></div>
-          <div class="board-legend"><span><b class="legend-square prop"></b>可購買店面</span><span><b class="legend-square event"></b>答題事件</span><span>🏁 經過起點 +$200</span></div>
+          <div class="section-head"><div><span class="overline">DECIMAL ISLAND</span><h2>小數富翁地圖</h2></div><div class="game-clock-group"><div id="round-chip" class="round-chip">第 1 / 12 輪</div><div id="session-clock" class="session-clock">⏱️ 30:00</div></div></div>
+          <div class="track-tools"><span class="track-instruction">🛣️ 30 格彎曲車道 · 可左右滑動；棋子會逐格移動</span><div class="track-zoom"><button type="button" class="btn outline small" id="map-overview">🔎 全覽</button><button type="button" class="btn outline small" id="map-fullsize">🔍 放大地圖</button></div></div><div class="board-wrapper"><div id="board" class="board" aria-label="大富翁遊戲棋盤"><div id="board-center" class="board-center"></div></div></div>
+          <div class="board-legend"><span><b class="legend-square prop"></b>可購買店面</span><span><b class="legend-square event"></b>答題事件</span><span>🏁 經過起點 +$200</span><span>⚔️ 別人的房產：繳租後雙人加賽</span></div>
           <section class="panel history-panel"><h3>📣 冒險紀錄 <small>最新事件置頂</small></h3><div id="history" class="history" aria-live="polite"></div></section>
         </section>
         <aside class="side-column">
           <section class="panel current-panel"><div class="side-eyebrow">NOW PLAYING <span id="turn-status" class="mini-badge">進行中</span></div><div id="current-player" class="current-player"></div><div id="turn-actions" class="turn-actions"></div></section>
-          <section id="question-panel" class="panel question-panel" hidden></section>
+          <section id="duel-panel" class="panel duel-panel" hidden></section><section id="question-panel" class="panel question-panel" hidden></section>
           <section id="result-panel" class="panel result-panel" hidden></section>
           <section class="panel ranking-panel"><div class="ranking-header"><h3>🏆 財富排行榜</h3><small>總資產＝現金＋房產價值</small></div><div id="scoreboard"></div></section>
-          <section id="teacher-panel" class="panel teacher-panel" hidden><div class="side-eyebrow">👑 房主控制台</div><p>學生無法操作時，可跳過目前回合；結束時統計所有玩家資產。</p><div class="teacher-actions"><button id="skip-btn" class="btn outline small">⏭️ 略過目前回合</button><button id="finish-btn" class="btn warning small">結束並結算</button></div></section>
+          <section id="teacher-panel" class="panel teacher-panel" hidden><div class="side-eyebrow">👑 房主控制台</div><p>學生無法操作時，可略過題目或雙人小遊戲；30 分鐘倒數結束後自動結算，亦可提前結束。</p><div class="teacher-actions"><button id="skip-btn" class="btn outline small">⏭️ 略過目前回合</button><button id="finish-btn" class="btn warning small">結束並結算</button></div></section>
         </aside>
       </div>
     </section>

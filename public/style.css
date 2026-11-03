@@ -43,3 +43,74 @@
 @keyframes log-arrive{from{transform:translateY(-12px);opacity:.2}to{transform:translateY(0);opacity:1}}
 @media(max-width:640px){.dice-rolling-face{font-size:clamp(54px,16vw,89px)}.moving-pawn{min-width:23px;min-height:23px;padding:1px;border-width:2px;font-size:clamp(15px,4.4vw,25px)}.event-spotlight{top:75px;padding:12px 14px;gap:10px;border-radius:15px}.spotlight-icon{font-size:34px}.history-panel h3 small{font-size:9px}}
 @media(prefers-reduced-motion:reduce){.dice-rolling-face,.moving-pawn,.spotlight-icon,.log-line.just-added{animation:none!important}.moving-pawn{transition-duration:.06s}.event-spotlight{transition:none}}
+
+/* v1.2 彎曲環島賽道、雙人小遊戲與 30 分鐘課堂節奏 */
+.play-grid{grid-template-columns:minmax(0,1fr) minmax(340px,410px)}
+.board-column{min-width:0}
+.track-tools{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0 10px;flex-wrap:wrap}
+.track-instruction{font-size:12px;font-weight:800;color:#476e77}
+.track-zoom{display:flex;gap:8px}
+.board-wrapper{overflow-x:auto;overflow-y:hidden;overscroll-behavior-inline:contain;scrollbar-color:#a4c9b7 #ecf5e9;scrollbar-width:thin;padding:9px;border-radius:23px}
+.board{position:relative;display:block;box-sizing:border-box;min-width:1450px;width:1450px;height:1040px;aspect-ratio:auto;overflow:hidden;padding:0;border:8px solid #e5eec9;border-radius:32px;background:radial-gradient(ellipse at 45% 30%,#e4f4cd 1%,#eff9e4 40%,#d5eabe 82%),repeating-linear-gradient(-25deg,transparent 0,transparent 75px,#ffffff15 76px,#ffffff15 78px)}
+.road-svg{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.road-svg path{fill:none;stroke-linecap:round;stroke-linejoin:round}
+.road-border{stroke:#afc4b3;stroke-width:144}
+.road-asphalt{stroke:#78899c;stroke-width:126;filter:drop-shadow(0 6px 3px #53665f2e)}
+.road-dashes{stroke:#fff6be;stroke-width:3.5;stroke-dasharray:13 22;opacity:.9}
+.road-decor{position:absolute;inset:0;pointer-events:none;z-index:1}
+.road-tree{position:absolute;font-size:50px;filter:drop-shadow(2px 5px 2px #6885732e)}
+.tree-a{left:22%;top:26%}.tree-b{left:76%;top:36%}.tree-c{left:27%;top:69%}.tree-d{left:68%;top:76%}.tree-e{left:79%;top:67%}
+.board .tile{position:absolute;display:flex;grid-row:auto;grid-column:auto;z-index:3;transform:translate(-50%,-50%);width:80px;height:71px;min-width:80px;padding:7px 2px 2px;gap:1px;border:2px solid #d8e0d9;border-radius:13px;background:#fffefa;overflow:visible;box-shadow:0 4px 0 #d5dddc,0 6px 9px #1f3c5152;transition:filter .2s,outline .15s}
+.board .tile:hover{z-index:8;filter:brightness(1.07)}
+.board .tile .tile-number{position:absolute;top:-10px;left:-9px;padding:3px 5px;border-radius:7px;background:#233e56;color:#fff;font-size:10px;font-weight:1000;line-height:1}
+.board .tile .tile-icon{font-size:23px;line-height:1.1}
+.board .tile .tile-name{font-size:10px;line-height:1.2;font-weight:1000;letter-spacing:0;word-break:keep-all;white-space:nowrap}
+.board .tile .tile-price{font-size:10px;font-weight:900;line-height:1}
+.board .tile .tile-pawns{position:absolute;right:-4px;bottom:-9px;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:0;background:#fffce8d9;border:1px solid #eedbaf;border-radius:9px;min-height:15px;max-width:100px;max-height:none;padding:0 2px}
+.board .tile .pawn{font-size:18px;margin:0 -2px}
+.board .tile .owner-mini{top:-12px;right:-9px;background:#fff6d7;border:1px solid #f2d787;box-shadow:0 2px 3px #233a4250;border-radius:99px;font-size:18px;padding:0 3px}
+.board .tile.active-tile{outline:3px solid #ffd367;outline-offset:2px;z-index:7}
+.board .tile.owned{border-color:#e9b76e}
+.board .tile.tile-move-target{outline:5px solid #ffcd52;outline-offset:3px;z-index:9;background:#fff7bc}
+.board .board-center{position:absolute;grid-row:auto;grid-column:auto;z-index:2;left:28%;top:33%;width:44%;height:34%;background:linear-gradient(145deg,#f4ffe6f5,#fff9e6f7);border:5px solid #fbfff5;border-radius:32px;box-shadow:0 10px 24px #537b6b22;overflow:hidden;padding:15px}
+.board .board-center .center-title{font-size:39px}
+.board .board-center .center-logo{font-size:52px}
+.board .board-center .center-desc{font-size:14px}
+.board .board-center .dice-face{font-size:57px}
+.board .dice-stage{border-radius:30px}
+.board .moving-pawn{z-index:13;font-size:37px}
+.game-clock-group{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:7px}
+.session-clock{border-radius:99px;padding:10px 15px;color:#24625f;font-size:14px;background:#e1f6e7;border:1px solid #b8d9c3;font-weight:1000;white-space:nowrap;font-variant-numeric:tabular-nums}
+.session-clock.ending{background:#fff0d6;border-color:#efb577;color:#a35c3a;animation:clock-flash 1.4s ease-in-out infinite alternate}
+@keyframes clock-flash{to{box-shadow:0 0 0 4px #ffd39e77}}
+.settings-note{font-size:12px;color:#6d7d83;line-height:1.7;padding:5px 2px}
+.duel-panel{border:3px solid #dfbd78;background:linear-gradient(135deg,#fff5dd,#fff9ee);box-shadow:0 8px 20px #af744a22}
+.duel-panel h3{margin:10px 0;font-size:26px}.duel-panel h3 small{font-size:13px;color:#8d7559}
+.duel-how{line-height:1.8;font-size:13px;color:#745d47}
+.duel-vs{display:grid;grid-template-columns:minmax(0,1fr) 36px minmax(0,1fr);gap:9px;align-items:center;margin:14px 0;padding:14px;border-radius:15px;background:#ffffffc0;border:1px solid #eacda0;text-align:center}
+.duel-vs>div{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:28px}
+.duel-vs>div strong{font-size:15px;line-height:1.25;overflow-wrap:anywhere}
+.duel-vs>div small{font-size:11px;color:#8c7a63;font-weight:800}
+.duel-vs>b{font-size:18px;color:#e17c56}
+.duel-stake{padding:9px 12px;background:#fff6cb;border:1px solid #efd796;border-radius:11px;font-size:13px;line-height:1.7;font-weight:800}
+.duel-attacker,.duel-last{margin-top:9px;font-size:13px;line-height:1.6;color:#705b4d}
+.duel-timer{font-size:13px;font-weight:900;color:#bb6747;margin-top:10px}
+.duel-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-top:12px}
+.duel-choice{background:#fff;border:2px solid #e8cba9;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:74px;padding:8px 5px;font-size:13px;font-weight:900;color:#4d4c48;transition:.15s}
+.duel-choice:hover:not(:disabled){border-color:#f58f5d;background:#fff0d6;transform:translateY(-2px)}
+.duel-choice span{font-size:31px;line-height:1.2}
+.duel-wait{padding:13px;background:#eaf3e2;color:#43705f;border-radius:12px;font-size:13px;font-weight:800;line-height:1.6}
+.question-panel h3{line-height:1.75}
+.question-panel .question-hint{line-height:1.7}
+.result-answer{line-height:1.85}
+@media(max-width:1180px){.play-grid{grid-template-columns:minmax(0,1fr)}.board-column{max-width:none;width:100%}.side-column{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){.game-clock-group{justify-content:space-between;width:100%;margin-top:10px}.session-clock{font-size:12px;padding:8px 10px}.board-wrapper{padding:5px}.board{border-width:6px}.track-zoom .btn{font-size:11px;padding:8px 10px}.track-instruction{font-size:11px}.side-column{grid-template-columns:1fr}.duel-options{grid-template-columns:repeat(3,minmax(0,1fr))}.duel-choice{min-height:67px}}
+@media(prefers-reduced-motion:reduce){.session-clock.ending{animation:none}}
+
+/* v1.2.1 地圖格子保持距離，手機可二維捲動並自動追蹤棋子 */
+.board .tile{width:74px;min-width:74px;height:65px;padding-top:5px}
+.board .tile .tile-icon{font-size:21px}
+.board .tile .tile-name{font-size:9px}
+.board .tile .tile-price{font-size:9px}
+.board-wrapper{overflow-x:auto;overflow-y:auto}
+@media(max-width:650px){.board-wrapper{max-height:510px;touch-action:pan-x pan-y}}

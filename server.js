@@ -74,6 +74,9 @@ io.on('connection',(socket)=>{
   socket.on('answer',action(({index})=>{
     const {room,playerId}=identity();games.answer(room,playerId,index);broadcast(room);
   }));
+  socket.on('duelChoice',action(({choice})=>{
+    const {room,playerId}=identity();games.duelChoice(room,playerId,choice);broadcast(room);
+  }));
   socket.on('buy',action(({buy})=>{
     const {room,playerId}=identity();games.decideBuy(room,playerId,buy===true);broadcast(room);
   }));

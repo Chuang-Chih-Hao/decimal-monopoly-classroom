@@ -78,7 +78,9 @@ test('正常過路費從租客轉給屋主',()=>{
   game.nextTurn(room,host.id,true);
   forceDie(game,room,student.id,1);
   assert.equal(student.cash,865);assert.equal(host.cash,935);
-  assert.equal(room.phase,'between');
+  assert.equal(room.phase,'duel');
+  assert.equal(room.duel.renterId,student.id);
+  assert.equal(room.duel.ownerId,host.id);
 });
 
 test('租金不足先作救援題，答對有補助，答錯暫停下一輪',()=>{
@@ -110,7 +112,7 @@ test('Boss 有 2 道題，兩題對加 $250、只有一題對加 $90',()=>{
 
 test('經過起點領薪水，回合結束排序以資產計算',()=>{
   const {game,room,host,student}=setup();
-  host.position=23;
+  host.position=BOARD.length-1;
   forceDie(game,room,host.id,1);
   assert.equal(host.position,0);assert.equal(host.cash,1100);
   assert.equal(room.phase,'between');
@@ -139,11 +141,11 @@ test('問答逾時視為答錯、題目會在同類型用完前不重複',()=>{
 
 test('每次擲骰附有唯一事件 ID、起點與終點，供全房間重播動畫',()=>{
   const {game,room,host,student}=setup();
-  host.position=23;
+  host.position=BOARD.length-1;
   forceDie(game,room,host.id,3);
   const first=game.publicState(room).lastRoll;
   assert.match(first.id,/^[0-9a-f-]{36}$/);
-  assert.equal(first.from,23);
+  assert.equal(first.from,BOARD.length-1);
   assert.equal(first.position,2);
   assert.equal(first.die,3);
   game.nextTurn(room,host.id,true);
@@ -162,4 +164,160 @@ test('80 元打 7.5 折：省下 20 元、售價 60 元的題目解析完整且�
   assert.match(discount.explanation,/80 − 60 = 20/);
   assert.ok(scam);assert.equal(scam.answer,'60 元');
   assert.match(scam.explanation,/多收了 10 元/);
+});
+
+
+test('棋盤剛好 30 格、索引連續且房產價格／租金合法',()=>{
+  assert.equal(BOARD.length,30);
+  for(let i=0;i<BOARD.length;i++){
+    assert.equal(BOARD[i].id,i);
+    if(BOARD[i].type==='property'){
+      assert.ok(BOARD[i].price>0);assert.ok(BOARD[i].rent>0);
+      assert.ok(BOARD[i].rent<BOARD[i].price);
+    }
+  }
+});
+
+test('每題預設 120 秒、房主可調整至 180 秒，30 分鐘結算上限',()=>{
+  const {game,room,host}=setup();
+  const now=Date.now();
+  game.ask(room,'calc');
+  assert.ok(room.pending.expiresAt-now<=121000);
+  assert.ok(room.pending.expiresAt-now>=119000);
+  assert.equal(room.questionSeconds,120);
+  const publicRoom=game.publicState(room);
+  assert.equal(publicRoom.questionSeconds,120);
+  assert.equal(publicRoom.durationMinutes,30);
+  const newGame=new GameManager();
+  const {room:other,player:teacher}=newGame.newRoom('老師','capybara');
+  newGame.join(other.code,'同學','🐈');
+  newGame.start(other,teacher.id,{rounds:12,money:900,questionSeconds:180,durationMinutes:30});
+  newGame.ask(other,'calc');
+  assert.equal(other.questionSeconds,180);
+  assert.ok(other.pending.expiresAt-Date.now()>=179000);
+});
+
+test('91 題均有具體情境和完整解析、對比價／折扣關鍵量明確',()=>{
+  for(const qs of Object.values(BANK))for(const q of qs){
+    assert.ok(q.question.length>=33,`${q.id} 題目太短`);
+    assert.ok(q.explanation.includes('解題步驟'),`${q.id} 缺解析`);
+    assert.ok(q.explanation.includes('解題提醒'),`${q.id} 缺提醒`);
+  }
+  assert.match(BANK.discount[6].question,/省下多少元/);
+  assert.match(BANK.scam[4].question,/應付售價/);
+  assert.match(BANK.boss[6].question,/半箱/);
+});
+
+test('租金先扣，再雙人猜拳，伺服器不外洩雙方未公開的手勢',()=>{
+  const {game,room,host,student}=setup();
+  room.properties[1]=host.id;host.properties.push(1);
+  game.nextTurn(room,host.id,true);forceDie(game,room,student.id,1);
+  assert.equal(student.cash,865);assert.equal(host.cash,935);
+  assert.equal(room.phase,'duel');
+  room.duel.mode='rps';
+  const snap=game.publicState(room);
+  assert.deepEqual(snap.duel.ready,{renter:false,owner:false});
+  assert.equal(JSON.stringify(snap.duel).includes('choices'),false);
+  assert.throws(()=>game.duelChoice(room,'路人',0),GameError);
+  game.duelChoice(room,student.id,0); // 石頭
+  assert.deepEqual(game.publicState(room).duel.ready,{renter:true,owner:false});
+  assert.equal(JSON.stringify(game.publicState(room).duel).includes('choices'),false);
+  assert.throws(()=>game.duelChoice(room,student.id,0),GameError);
+  game.duelChoice(room,host.id,2); // 剪刀
+  assert.equal(room.phase,'between');
+  assert.equal(room.lastDuel.winnerId,student.id);
+  assert.equal(room.lastDuel.paid,40);
+  assert.equal(student.cash,905);assert.equal(host.cash,895);
+});
+
+test('猜拳平手重賽、烏龜烏龜翹相同手指時攻擊方獲勝',()=>{
+  const {game,room,host,student}=setup();
+  game.beginDuel(room,student,host,BOARD[1]);
+  room.duel.mode='rps';room.duel.maxRounds=3;
+  game.duelChoice(room,host.id,1);
+  game.duelChoice(room,student.id,1);
+  assert.equal(room.duel.round,2);
+  assert.equal(room.phase,'duel');
+  room.duel.mode='turtle';room.duel.maxRounds=4;
+  room.duel.attackerId=host.id;
+  game.duelChoice(room,host.id,3);
+  game.duelChoice(room,student.id,3);
+  assert.equal(room.phase,'between');
+  assert.equal(room.lastDuel.winnerId,host.id);
+  assert.equal(student.cash,860);assert.equal(host.cash,940);
+});
+
+test('烏龜烏龜翹不同手指交換攻守；無限迴圈由回合上限阻止',()=>{
+  const {game,room,host,student}=setup();
+  game.beginDuel(room,student,host,BOARD[1]);
+  room.duel.mode='turtle';room.duel.maxRounds=4;room.duel.attackerId=host.id;
+  for(let round=1;round<=4;round++){
+    game.duelChoice(room,host.id,0);
+    game.duelChoice(room,student.id,1);
+    if(round<4){assert.equal(room.duel.round,round+1);assert.equal(room.duel.attackerId,round%2?student.id:host.id);}
+  }
+  assert.equal(room.phase,'between');assert.equal(room.lastDuel.winnerId,null);
+  assert.equal(host.cash,900);assert.equal(student.cash,900);
+});
+
+test('小遊戲逾時：已出招者獲勝；兩人皆未出招則免付補貼',()=>{
+  const {game,room,host,student}=setup();
+  game.beginDuel(room,student,host,BOARD[1]);
+  room.duel.mode='rps';game.duelChoice(room,host.id,0);
+  room.duel.expiresAt=Date.now()-1;game.tick(()=>{});
+  assert.equal(room.phase,'between');assert.equal(room.lastDuel.winnerId,host.id);
+  game.beginDuel(room,student,host,BOARD[1]);
+  room.duel.expiresAt=Date.now()-1;game.tick(()=>{});
+  assert.equal(room.lastDuel.winnerId,null);
+});
+
+test('補貼只付身上有的現金，且租金不足救援後仍會觸發加賽',()=>{
+  const {game,room,host,student}=setup();
+  room.properties[1]=host.id;host.properties.push(1);
+  game.nextTurn(room,host.id,true);
+  student.cash=10;forceDie(game,room,student.id,1);
+  assert.equal(room.pending.type,'rescue');
+  game.answer(room,student.id,chooseCorrect(room));
+  assert.equal(student.cash,0);
+  assert.equal(room.phase,'duel');
+  room.duel.mode='rps';
+  game.duelChoice(room,host.id,2);game.duelChoice(room,student.id,0);
+  assert.equal(room.lastDuel.winnerId,student.id);
+  assert.equal(room.lastDuel.paid,40); // 屋主有足夠現金
+  assert.equal(student.cash,40);
+  game.beginDuel(room,student,host,BOARD[1]);
+  room.duel.mode='rps';student.cash=2;
+  game.duelChoice(room,host.id,0);game.duelChoice(room,student.id,2);
+  assert.equal(room.lastDuel.paid,2);assert.equal(student.cash,0);
+});
+
+test('30 分鐘到期後由伺服器自動結算；進行中的答題不會被半途截斷',()=>{
+  const {game,room,host}=setup();
+  game.ask(room,'calc');room.endsAt=Date.now()-1;
+  game.tick(()=>{});
+  assert.equal(room.status,'playing');
+  game.answer(room,host.id,chooseCorrect(room));
+  game.tick(()=>{});
+  assert.equal(room.status,'finished');
+});
+
+test('後段加碼會更新獎勵，答對數學題獲得額外 $60',()=>{
+  const {game,room,host}=setup();
+  room.endsAt=Date.now()+9*60*1000; // 從 30 分鐘原始期限倒推，已遊玩 21 分鐘
+  game.tick(()=>{});
+  assert.equal(room.bonusStage,2);
+  game.ask(room,'calc');game.answer(room,host.id,chooseCorrect(room));
+  assert.equal(host.cash,900+85+60);
+});
+
+test('小遊戲由房主略過時不進行額外轉帳',()=>{
+  const {game,room,host,student}=setup();
+  room.properties[1]=host.id;host.properties.push(1);
+  game.nextTurn(room,host.id,true);forceDie(game,room,student.id,1);
+  assert.equal(room.phase,'duel');
+  const before=[host.cash,student.cash];
+  game.nextTurn(room,host.id,true);
+  assert.deepEqual([host.cash,student.cash],before);
+  assert.equal(room.duel,null);
+  assert.equal(room.currentPlayerId,host.id);
 });
