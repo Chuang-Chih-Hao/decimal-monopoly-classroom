@@ -325,3 +325,44 @@
 .update-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:900px;margin:10px auto;padding:12px 16px;background:#fff4d5;border:1px solid #e2cc7a;border-radius:13px;font-size:14px;font-weight:750}
 .update-banner[hidden]{display:none}
 @media(max-width:520px){.update-banner{flex-direction:column;align-items:stretch}}
+
+/* v1.6 立體動物旗子棋子 */
+.animal-icon{display:inline-flex;align-items:center;justify-content:center;line-height:1}
+.animal-icon .animal-img{height:1.1em;width:1.1em}
+.animal-flag{--flag-accent:var(--player-color,#8e67d5);--flag-surface:color-mix(in srgb,var(--player-light,#efe8ff) 76%,white);position:relative;display:inline-grid;grid-template-columns:auto auto;grid-template-rows:auto auto;align-items:center;justify-items:start;gap:0;vertical-align:middle;filter:drop-shadow(0 2px 2px rgba(46,58,70,.18))}
+.animal-flag__cloth{grid-column:1;grid-row:1;position:relative;display:inline-flex;align-items:center;justify-content:center;min-width:1.5em;height:1.08em;padding:.08em .28em .08em .2em;border-radius:.24em .46em .34em .16em;background:linear-gradient(150deg,var(--flag-surface) 0%,#fff 42%,var(--flag-surface) 100%);border:.11em solid var(--flag-accent);border-right-width:.14em;box-shadow:inset 0 -.12em 0 rgba(255,255,255,.35),inset 0 .12em 0 rgba(255,255,255,.7);transform-origin:left center}
+.animal-flag__cloth::after{content:'';position:absolute;right:-.22em;top:50%;transform:translateY(-50%);width:0;height:0;border-top:.16em solid transparent;border-bottom:.16em solid transparent;border-left:.22em solid var(--flag-surface);filter:drop-shadow(.06em 0 0 var(--flag-accent))}
+.animal-flag__icon{font-size:.78em;line-height:1;display:inline-flex;align-items:center;justify-content:center}
+.animal-flag__icon .animal-img{height:.95em;width:.95em}
+.animal-flag__pole{grid-column:2;grid-row:1 / span 2;align-self:stretch;justify-self:start;width:.14em;min-height:1.42em;background:linear-gradient(180deg,#fff8e9 0%,#d2a45c 28%,#9b6f2a 100%);border-radius:999px;margin-left:-.03em;box-shadow:inset -.03em 0 0 rgba(88,60,20,.18)}
+.animal-flag__base{grid-column:2;grid-row:2;justify-self:center;width:.62em;height:.18em;border-radius:999px;background:linear-gradient(180deg,#c99d56,#8b652b);box-shadow:0 .06em 0 rgba(0,0,0,.12)}
+.animal-flag--mini .animal-flag__cloth{min-width:1.25em;height:.92em;padding:.03em .2em .03em .14em}
+.animal-flag--mini .animal-flag__icon{font-size:.68em}
+.animal-flag--mini .animal-flag__pole{width:.12em;min-height:1.16em}
+.animal-flag--mini .animal-flag__base{width:.5em;height:.16em}
+.animal-flag--hero .animal-flag__cloth{min-width:1.86em;height:1.34em;padding:.12em .4em .12em .24em;border-width:.12em;border-right-width:.18em}
+.animal-flag--hero .animal-flag__icon{font-size:1em}
+.animal-flag--hero .animal-flag__pole{width:.17em;min-height:1.76em}
+.animal-flag--hero .animal-flag__base{width:.74em;height:.22em}
+.lobby-animal .animal-flag{font-size:28px}
+.identity-chip .animal-flag,.score-avatar .animal-flag,.end-row .avatar .animal-flag{font-size:24px}
+.active-animal{background:linear-gradient(180deg,#fff9f0,#fff2dc)}
+.active-animal .animal-flag{font-size:34px}
+.board .tile .tile-pawns{background:#fffceccf;border:1px solid #eedbaf;border-radius:10px;padding:2px 3px 1px;gap:1px}
+.board .tile .pawn{display:inline-flex;align-items:flex-end;justify-content:center;font-size:15px;line-height:1;margin:0}
+.board .tile .pawn .animal-flag{font-size:15px}
+.board .tile .owner-mini{display:inline-flex;align-items:center;gap:2px;padding:1px 4px 1px 2px;background:color-mix(in srgb,var(--player-light,#f3f7fb) 82%,white);border:1px solid color-mix(in srgb,var(--player-color,#7fa3d7) 55%,white);max-width:calc(100% - 4px)}
+.board .tile .owner-mini .animal-flag{font-size:11px;flex:0 0 auto}
+.board .tile .owner-mini span:last-child{max-width:56px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.board .moving-pawn{min-width:72px;min-height:72px;background:transparent;border:0;box-shadow:none;padding:0;animation:moving-pawn-hop .26s ease-in-out infinite alternate}
+.board .moving-pawn .animal-flag{font-size:40px}
+.current-identity .animal-flag{font-size:33px}
+@media(max-width:640px){
+  .lobby-animal .animal-flag{font-size:22px}
+  .board .tile .pawn{font-size:10px}
+  .board .tile .pawn .animal-flag{font-size:10px}
+  .board .tile .owner-mini .animal-flag{font-size:8px}
+  .board .moving-pawn{min-width:44px;min-height:44px}
+  .board .moving-pawn .animal-flag{font-size:24px}
+  .active-animal .animal-flag{font-size:26px}
+}
