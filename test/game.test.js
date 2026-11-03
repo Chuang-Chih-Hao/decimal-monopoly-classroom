@@ -501,3 +501,124 @@ test('調整金錢平衡：普通題、寶箱與 Boss 頒發較少獎金，基�
   room.bonusStage=2;game.ask(room,'discount');game.answer(room,host.id,chooseCorrect(room));
   assert.equal(host.cash,1245); // 折扣題 50 + 最後 30
 });
+
+
+// v1.7.0：觀戰猜題由伺服器儲存，玩家之間不可偷看答案。
+test('全員觀戰猜題：非當回合玩家可投一票，答案揭曉前不洩漏正解與他人選項',()=>{
+  const {game,room,host,student}=setup();
+  game.ask(room,'discount');
+  const index=chooseCorrect(room);
+  assert.throws(()=>game.spectatorGuess(room,host.id,index),GameError);
+  assert.throws(()=>game.spectatorGuess(room,student.id,4),GameError);
+  game.spectatorGuess(room,student.id,index);
+  assert.throws(()=>game.spectatorGuess(room,student.id,0),GameError);
+  assert.equal(game.publicState(room,host.id).spectatorPoll.myChoice,null);
+  assert.equal(game.publicState(room,student.id).spectatorPoll.myChoice,index);
+  assert.equal(game.publicState(room,host.id).spectatorPoll.submitted,1);
+  assert.equal(JSON.stringify(game.publicState(room,host.id)).includes('correctIndex'),false);
+  assert.equal(student.attempted,0);
+  game.answer(room,host.id,index);
+  assert.equal(game.publicState(room,host.id).lastPoll.correctCount,1);
+  assert.equal(game.publicState(room,student.id).lastPoll.myCorrect,true);
+  assert.equal(game.publicState(room,host.id).lastPoll.myCorrect,null);
+  assert.equal(student.cash,room.startMoney);
+  assert.equal(student.attempted,0);
+  assert.equal(student.answerHistory.length,0);
+});
+
+test('觀戰猜題：答錯不扣現金、正式答題統計不變，跳過題目不計觀戰成績',()=>{
+  const {game,room,host,student}=setup();
+  game.ask(room,'calc');game.spectatorGuess(room,student.id,chooseWrong(room));
+  game.answer(room,host.id,chooseCorrect(room));
+  assert.equal(student.spectatorAttempted,1);
+  assert.equal(student.spectatorCorrect,0);
+  assert.equal(student.attempted,0);
+  assert.equal(student.cash,900);
+  game.ask(room,'calc');game.spectatorGuess(room,student.id,chooseCorrect(room));
+  game.nextTurn(room,host.id,true);
+  assert.equal(student.spectatorAttempted,1);
+  assert.equal(room.lastPoll,null);
+  assert.throws(()=>game.spectatorGuess(room,student.id,0),GameError);
+});
+
+test('觀戰連續猜對三題可解鎖觀戰成就，稱號可裝備但不能冒領未解鎖稱號',()=>{
+  const {game,room,host,student}=setup();
+  assert.throws(()=>game.equipTitle(room,student.id,'spectator_star'),GameError);
+  for(let n=0;n<3;n++){
+    game.ask(room,'discount');
+    game.spectatorGuess(room,student.id,chooseCorrect(room));
+    game.answer(room,host.id,chooseWrong(room));
+  }
+  assert.equal(student.spectatorCorrect,3);
+  assert.equal(student.attempted,0);
+  assert.ok(student.achievements.includes('spectator_star'));
+  game.equipTitle(room,student.id,'spectator_star');
+  assert.equal(game.publicState(room,host.id).players.find(p=>p.id===student.id).titleId,'spectator_star');
+  assert.throws(()=>game.equipTitle(room,student.id,'unknown'),GameError);
+});
+
+test('命運與機會事件新增劇情兩選一，再進入原題庫作答，其他玩家不能選',()=>{
+  const {game,room,host,student}=setup();
+  game.land(room,host,BOARD[4]);
+  assert.equal(room.phase,'story');
+  const options=room.pending.choices;
+  assert.equal(options.length,2);
+  assert.ok(options[0].fail>=options[1].fail);
+  const snapshot=game.publicState(room,student.id);
+  assert.ok(snapshot.pending.story.scene.length>10);
+  assert.equal(snapshot.pending.question,undefined);
+  assert.throws(()=>game.chooseStory(room,student.id,'safe'),GameError);
+  assert.throws(()=>game.chooseStory(room,host.id,'hack'),GameError);
+  game.chooseStory(room,host.id,'bold');
+  assert.equal(room.phase,'answering');
+  assert.equal(room.pending.type,'chance');
+  assert.ok(host.achievements.includes('story_brave'));
+  assert.ok(!JSON.stringify(game.publicState(room,student.id)).includes('correctIndex'));
+  const card=room.pending.context.card;
+  assert.equal(card.success,options[1].success);
+  game.answer(room,host.id,chooseCorrect(room));
+  assert.equal(room.phase,'between');
+  assert.ok(room.log.some(l=>l.text.includes('分支')));
+});
+
+test('劇情選擇逾時自動採穩健分支，房主可以略過且不會卡住遊戲',()=>{
+  const {game,room,host}=setup();
+  game.land(room,host,BOARD[8]);
+  const expected=room.pending.choices[0].success;
+  room.pending.expiresAt=Date.now()-1;
+  game.tick(()=>{});
+  assert.equal(room.phase,'answering');
+  assert.equal(room.pending.type,'fate');
+  assert.equal(room.pending.context.card.success,expected);
+  game.nextTurn(room,host.id,true);
+  assert.equal(room.phase,'rolling');
+  room.currentPlayerId=host.id;
+  game.land(room,host,BOARD[23]);
+  assert.equal(room.phase,'story');
+  game.nextTurn(room,host.id,true);
+  assert.equal(room.phase,'rolling');
+  assert.equal(room.pending,null);
+});
+
+test('成就與稱號：正式答題、購地達標自動解鎖，結算後保留、重開局清空',()=>{
+  const {game,room,host}=setup();
+  game.ask(room,'calc');
+  game.answer(room,host.id,chooseCorrect(room));
+  assert.ok(host.achievements.includes('first_answer'));
+  for(let n=0;n<2;n++){game.ask(room,'discount');game.answer(room,host.id,chooseCorrect(room));}
+  assert.ok(host.achievements.includes('three_correct'));
+  assert.ok(host.achievements.includes('discount_master'));
+  game.ask(room,'purchase',{tileId:1});
+  game.answer(room,host.id,chooseCorrect(room));
+  game.decideBuy(room,host.id,true);
+  assert.ok(host.achievements.includes('first_property'));
+  game.equipTitle(room,host.id,'discount_master');
+  game.finishByHost(room,host.id);
+  assert.equal(game.publicState(room,host.id).rankings.find(p=>p.id===host.id).titleId,'discount_master');
+  assert.equal(game.publicState(room,host.id).players.find(p=>p.id===host.id).titleId,'discount_master');
+  game.reset(room,host.id);
+  assert.equal(host.titleId,null);
+  assert.deepEqual(host.achievements,[]);
+  assert.equal(host.spectatorCorrect,0);
+  assert.equal(room.lastAchievement,null);
+});

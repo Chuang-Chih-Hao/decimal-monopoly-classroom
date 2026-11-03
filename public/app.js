@@ -1,7 +1,7 @@
 /* 小數富翁前端：所有資產、擲骰、判分都以伺服器狀態為準。 */
 (() => {
   'use strict';
-  const CLIENT_VERSION='1.6.6';
+  const CLIENT_VERSION='1.7.0';
   const socket=io({transports:['websocket','polling'],reconnection:true});
   const $=id=>document.getElementById(id);
   const esc=(value)=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -25,6 +25,7 @@
   let spotlightTimer;
   let seenRollId=null;
   let seenLogId=null;
+  let seenAchievementId=null;
   let activeRollAnimation=null;
   let animationNonce=0;
   let deferredFeedback=null;
@@ -68,7 +69,7 @@
   }
   function clearSession(){
     animationNonce++;activeRollAnimation=null;deferredFeedback=null;
-    seenRollId=null;seenLogId=null;seenDuelResultId=null;mapFocusKey=null;mapZoom=1;reflectionDirty=false;
+    seenRollId=null;seenLogId=null;seenDuelResultId=null;seenAchievementId=null;mapFocusKey=null;mapZoom=1;reflectionDirty=false;
     $('event-spotlight').hidden=true;
     tokenData=null;me=null;state=null;
     try{localStorage.removeItem('decimal-monopoly-session');}catch{}
@@ -81,6 +82,7 @@
     seenRollId=next.lastRoll?.id??null;
     seenDuelResultId=next.lastDuel?.id??null;
     seenLogId=next.log?.[0]?.id??null;
+    seenAchievementId=next.lastAchievement?.id??null;
     render();
   }
   function showSpotlight(icon,title,detail='',kind='event'){
@@ -389,6 +391,11 @@
     }
     state=next;
     render();
+    if(next.lastAchievement?.id && next.lastAchievement.id!==seenAchievementId){
+      seenAchievementId=next.lastAchievement.id;
+      const badge=next.achievementCatalog?.find(a=>a.id===next.lastAchievement.achievementId);
+      if(next.lastAchievement.playerId===me && badge)showToast('🏅 解鎖成就：'+badge.title+'！可到成就區切換稱號。');
+    }
     if(isNewRoll)void playRollAnimation(next.lastRoll,animationNonce);
     else {
       highlightNewEvents(previous,next);
@@ -407,6 +414,8 @@
   function activePlayer(){return state?.players.find(p=>p.id===state.currentPlayerId);}
   function isMyTurn(){return state?.currentPlayerId===me;}
   function isHost(){return !!myPlayer()?.host;}
+  function badgeFor(id){return state?.achievementCatalog?.find(a=>a.id===id);}
+  function titleText(p){const badge=badgeFor(p?.titleId);return badge?badge.icon+' '+badge.title:'';}
   function render(){
     if(!state||!me)return;
     $('entry-screen').hidden=true;$('game-screen').hidden=false;
@@ -611,7 +620,7 @@
     $('current-player').innerHTML=current
       ?`<div class="current-identity" style="${colorStyle(current)}"><div class="active-animal">${animalHtml(current.animal)}</div><div><div class="active-name">${esc(current.name)}${isMyTurn()?' ✨':''}</div><div class="active-sub"><span class="person-color-dot"></span>${colorFor(current).name}棋子 · 現金 ${money(current.cash)} · ${current.properties.length} 處房產</div></div></div>`:'';
     if(!activeRollAnimation?.started)renderBoard();
-    renderTurnActions();renderQuestion();renderDuel();renderResult();renderMyAssets();renderScoreboard();renderLog();
+    renderTurnActions();renderQuestion();renderDuel();renderResult();renderMyAssets();renderAchievements();renderScoreboard();renderLog();
     $('teacher-panel').hidden=!isHost();
   }
   function renderTurnActions(){
@@ -621,6 +630,8 @@
     if(phase==='rolling'){
       el.innerHTML=turn?'<button id="roll-btn" class="btn primary roll-btn">🎲 擲骰子！</button><div class="phase-help">點擊後會沿著地圖前進 1～6 格。</div>':`<div class="phase-help">等待 ${esc(activePlayer()?.name)} 擲骰子…</div>`;
       $('roll-btn')?.addEventListener('click',()=>request('roll'));
+    }else if(phase==='story'){
+      el.innerHTML=`<div class="phase-help">${turn?'🔮 命運事件！請選擇一條冒險路線。':'🔮 '+esc(activePlayer()?.name)+' 正在決定命運分支！'}</div>`;
     }else if(phase==='answering'){
       el.innerHTML=`<div class="phase-help">${turn?'📖 你遇到了數學挑戰！請看下方題目。':'📖 '+esc(activePlayer()?.name)+' 正在解小數題，大家可以一起算算看！'}</div>`;
     }else if(phase==='buying'){
@@ -673,9 +684,24 @@
   }
   function renderQuestion(){
     const el=$('question-panel'),p=state.pending;
-    if(!p || (p.type!=='buying'&&!p.question)){el.hidden=true;return;}
+    if(!p || (p.type!=='buying'&&p.type!=='story'&&!p.question)){el.hidden=true;return;}
     el.hidden=false;
     const turn=isMyTurn()&&!activeRollAnimation;
+    if(p.type==='story'){
+      const info=p.story||{};
+      const options=info.choices||[];
+      const formatChange=n=>n>0?'獲得 '+money(n):n<0?'支出 '+money(-n):'金額不變';
+      el.innerHTML=`<div class="question-tag">🔮 劇情選擇 · ${esc(info.title||'命運事件')}</div>
+        <h3>📜 ${esc(info.scene||'神祕事件發生了！')}</h3>
+        <p class="story-hint">${turn?'選擇後會出現一道小數題，答對或答錯會依選擇決定結果。':'👀 觀戰中：只有當回合玩家能決定命運。'}</p>
+        <div class="story-choices">${options.map(c=>`<button class="story-choice" data-story-choice="${esc(c.id)}" ${!turn?'disabled':''}><strong>${esc(c.label)}</strong><span>${esc(c.detail)}</span><small>✅ 答對：${formatChange(c.success)}<br>📘 未答對：${formatChange(c.fail)}</small></button>`).join('')}</div>
+        <div id="story-timer-label" class="question-hint"></div>`;
+      el.querySelectorAll('[data-story-choice]').forEach(btn=>btn.addEventListener('click',()=>{
+        el.querySelectorAll('[data-story-choice]').forEach(b=>b.disabled=true);
+        request('storyChoice',{choiceId:btn.dataset.storyChoice},ok=>{if(!ok)renderQuestion();});
+      }));
+      updateTimer();return;
+    }
     if(p.type==='buying'){
       const tile=state.board.find(t=>t.id===p.tileId);
       el.innerHTML=`<div class="question-tag">🏡 購買土地</div><h3>恭喜通過計算！你要買下「${esc(tile.name)}」嗎？</h3><div class="buy-info"><strong>購地 ${money(tile.price)}</strong><small>未來其他玩家走到這格，將支付租金 ${money(tile.rent)} 給你。</small></div>${turn?'<div class="buy-actions"><button id="buy-yes" class="btn primary">💰 買下它！</button><button id="buy-no" class="btn outline">這次不要</button></div>':'<p class="question-hint">等這回合的玩家做決定…</p>'}`;
@@ -684,13 +710,21 @@
       return;
     }
     const opts=p.question.options;
-    const eventHeader=p.card?`<div class="event-card-head">🎴 ${esc(p.card.title)}<small>${esc(p.card.detail)}</small></div>`:'';
+    const poll=state.spectatorPoll;
+    const hasGuessed=poll?.myChoice!==null && poll?.myChoice!==undefined;
+    const canGuess=!isMyTurn()&&!activeRollAnimation&&poll&&!hasGuessed;
+    const spectatorNote=isMyTurn()?'選出正確答案；作答送出後不能更改。':hasGuessed?'✅ 你已送出觀戰猜題，答案保密，等待揭曉。':'👀 你也可以選一個答案參與觀戰猜題；不會扣款，也不計入正式答題分數。';
+    const eventHeader=p.card?`<div class="event-card-head">🎴 ${esc(p.card.title)}<small>${esc(p.card.choiceLabel||'')}${p.card.detail?'｜'+esc(p.card.detail):''}</small></div>`:'';
     const nextRound=p.total>1?` · 第 ${p.stage} / ${p.total} 題`:'';
-    el.innerHTML=`<div class="question-tag">📝 ${esc(typeNames[p.type]||'數學挑戰')}${nextRound}</div>${eventHeader}<h3>${esc(p.question.text)}</h3><div class="timer-bar"><div id="timer-fill" class="timer-fill"></div></div><div id="timer-label" class="question-hint"></div><div class="options">${opts.map((option,i)=>`<button class="option-btn" data-choice="${i}" ${!turn?'disabled':''}><span style="opacity:.55">${'ABCD'[i]}.</span> ${esc(option)}</button>`).join('')}</div><div class="question-hint">${turn?'選出正確答案；作答送出後不能更改。':'👀 現在只有當回合的玩家能送出答案。可以一起討論！'}</div>`;
+    el.innerHTML=`<div class="question-tag">📝 ${esc(typeNames[p.type]||'數學挑戰')}${nextRound}</div>${eventHeader}<h3>${esc(p.question.text)}</h3><div class="timer-bar"><div id="timer-fill" class="timer-fill"></div></div><div id="timer-label" class="question-hint"></div><div class="options">${opts.map((option,i)=>`<button class="option-btn${hasGuessed&&poll?.myChoice===i?' spectator-selected':''}" data-${turn?'choice':'spectator-choice'}="${i}" ${!turn&&!canGuess?'disabled':''}><span style="opacity:.55">${'ABCD'[i]}.</span> ${esc(option)}</button>`).join('')}</div><div class="question-hint">${spectatorNote}${poll?'｜已有 '+poll.submitted+' / '+poll.total+' 位觀戰者提交':''}</div>`;
     el.querySelectorAll('[data-choice]').forEach(b=>b.addEventListener('click',()=>{
       const index=Number(b.dataset.choice);
       el.querySelectorAll('[data-choice]').forEach(x=>x.disabled=true);
       request('answer',{index});
+    }));
+    el.querySelectorAll('[data-spectator-choice]').forEach(btn=>btn.addEventListener('click',()=>{
+      el.querySelectorAll('[data-spectator-choice]').forEach(b=>b.disabled=true);
+      request('spectatorGuess',{index:Number(btn.dataset.spectatorChoice)},ok=>{if(!ok)renderQuestion();});
     }));
     updateTimer();
   }
@@ -702,6 +736,8 @@
     if(timer)timer.textContent=`⏱️ 還有 ${rem} 秒（本題 ${state?.questionSeconds||120} 秒）｜可使用紙筆計算；逾時視為未答對`;
     if(fill){fill.style.width=`${Math.min(100,rem/(state?.questionSeconds||120)*100)}%`;fill.style.background=rem<20?'#d77470':'#e6a267';}
     }
+    const st=$('story-timer-label');
+    if(st&&p?.type==='story')st.textContent='⏱️ 還有 '+Math.max(0,Math.ceil((p.expiresAt-Date.now())/1000))+' 秒選擇；逾時自動採取穩健方案。';
     const d=state?.duel,dt=$('duel-timer');
     if(dt&&d)dt.textContent=`⏱️ 本次出手剩下 ${Math.max(0,Math.ceil((d.expiresAt-Date.now())/1000))} 秒；超時未出手可能判負。`;
     updateSessionClock();
@@ -711,7 +747,9 @@
     const el=$('result-panel'),r=state.lastResult;
     if(!r){el.hidden=true;return;}
     el.hidden=false;el.classList.toggle('is-wrong',!r.correct);
-    el.innerHTML=`<div class="result-head">${r.correct?'✅ 計算正確！':'📘 解題解析'}</div><div class="result-answer">正確答案：<strong>${esc(r.correctAnswer)}</strong><br/>${esc(r.explanation)}</div>`;
+    const poll=state.lastPoll;
+    const pollHtml=poll?`<div class="spectator-summary">👀 本題觀戰：${poll.correctCount} / ${poll.total} 人猜對${poll.myCorrect===true?' · ✅ 你也猜對了！':poll.myCorrect===false?' · 📘 下次再挑戰！':''}</div>`:'';
+    el.innerHTML=`<div class="result-head">${r.correct?'✅ 計算正確！':'📘 解題解析'}</div><div class="result-answer">正確答案：<strong>${esc(r.correctAnswer)}</strong><br/>${esc(r.explanation)}</div>${pollHtml}`;
   }
   function landValue(p){return p.properties.reduce((sum,id)=>sum+(state.board[id]?.price||0),0);}
   function wealth(p){return p.cash+landValue(p);}
@@ -735,13 +773,43 @@
   function renderScoreboard(){
     const el=$('scoreboard');
     const ranking=[...state.players].sort((a,b)=>wealth(b)-wealth(a)||b.correct-a.correct);
-    el.innerHTML=ranking.map((p,i)=>`<div class="score-row${p.id===me?' me':''}" style="${colorStyle(p)}"><div class="score-place">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div><div class="score-avatar">${animalHtml(p.animal)}</div><div class="score-content"><div class="score-name"><span class="person-color-dot"></span>${esc(p.name)} <small>${colorFor(p).name}</small>${p.host?' 👑':''}${!p.connected?' 🔌':''}${p.id===me?'（我）':''}</div><div class="score-detail">💵 現金 <b>${money(p.cash)}</b>　🏠 房產 <b>${money(landValue(p))}</b>（${p.properties.length} 處）</div><div class="score-detail">答對 ${p.correct}/${p.attempted} 題</div></div><div class="score-money"><small>總資產</small><strong>${money(wealth(p))}</strong></div></div>`).join('');
+    el.innerHTML=ranking.map((p,i)=>`<div class="score-row${p.id===me?' me':''}" style="${colorStyle(p)}"><div class="score-place">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div><div class="score-avatar">${animalHtml(p.animal)}</div><div class="score-content"><div class="score-name"><span class="person-color-dot"></span>${esc(p.name)} <small>${colorFor(p).name}</small>${titleText(p)?'<span class="rank-title">'+esc(titleText(p))+'</span>':''}${p.host?' 👑':''}${!p.connected?' 🔌':''}${p.id===me?'（我）':''}</div><div class="score-detail">💵 現金 <b>${money(p.cash)}</b>　🏠 房產 <b>${money(landValue(p))}</b>（${p.properties.length} 處）</div><div class="score-detail">答對 ${p.correct}/${p.attempted} 題</div></div><div class="score-money"><small>總資產</small><strong>${money(wealth(p))}</strong></div></div>`).join('');
   }
   function renderLog(){
     const current=state.log?.[0]?.id;
     const newEntry=!!seenLogId&&current!==seenLogId;
     $('history').innerHTML=state.log.map((l,i)=>`<div class="log-line${i===0?' latest':''}${i===0&&newEntry?' just-added':''}"><time>${new Date(l.at).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}</time>${esc(l.text)}</div>`).join('');
   }
+  function renderAchievements(){
+    const panel=$('achievement-panel'),mePlayer=myPlayer();
+    if(!panel||!mePlayer)return;
+    const catalog=state.achievementCatalog||[];
+    const earned=new Set(mePlayer.achievements||[]);
+    const title=badgeFor(mePlayer.titleId);
+    const poll=state.mySpectatorScore;
+    panel.innerHTML=`<div class="achievement-heading"><div><span class="overline">ADVENTURER BADGES</span><h3>🏅 我的冒險成就</h3></div><span>${earned.size} / ${catalog.length}</span></div>
+      <p class="achievement-current">目前稱號：<strong>${title?esc(title.icon+' '+title.title):'尚未解鎖'}</strong> · 👀 觀戰猜對 ${poll?.correct||0} / ${poll?.attempted||0} 題</p>
+      <div class="achievement-grid">${catalog.map(a=>{
+        const unlocked=earned.has(a.id);
+        const selected=mePlayer.titleId===a.id;
+        return `<div class="achievement-card${unlocked?' unlocked':' locked'}"><div class="achievement-icon">${unlocked?esc(a.icon):'🔒'}</div><strong>${esc(a.title)}</strong><small>${esc(a.description)}</small>${unlocked?`<button type="button" class="achievement-equip" data-title-id="${esc(a.id)}" ${selected?'disabled':''}>${selected?'已裝備':'設為稱號'}</button>`:'<span class="achievement-pending">待解鎖</span>'}</div>`;
+      }).join('')}</div>`;
+    panel.querySelectorAll('[data-title-id]').forEach(btn=>btn.addEventListener('click',()=>{
+      const achievementId=btn.dataset.titleId;
+      btn.disabled=true;
+      request('equipTitle',{achievementId},ok=>{if(!ok)renderAchievements();});
+    }));
+  }
+  function renderEndAchievements(){
+    const panel=$('end-achievements'),player=myPlayer();
+    if(!panel||!player)return;
+    const earned=new Set(player.achievements||[]);
+    const badges=(state.achievementCatalog||[]).filter(a=>earned.has(a.id));
+    panel.innerHTML='<h3>🏅 本局獲得的冒險成就</h3>'+(badges.length
+      ? '<div class="end-badges">'+badges.map(a=>'<span class="end-badge">'+esc(a.icon+' '+a.title)+'</span>').join('')+'</div>'
+      : '<p class="feedback-note">這局尚未獲得成就；下一次挑戰更多數學題吧！</p>');
+  }
+
   function renderLearningFeedback(){
     const el=$('learning-feedback');
     const mine=state.personalFeedback;
@@ -790,8 +858,9 @@
     ).join('');
   }
   function renderEnd(){
-    $('end-rankings').innerHTML=state.rankings.map((r,i)=>`<div class="end-row" style="${colorStyle(r)}"><strong>${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</strong><span class="avatar">${animalHtml(r.animal)}</span><div><strong><span class="person-color-dot"></span>${esc(r.name)}（${colorFor(r).name}）</strong><div class="end-stats">現金 ${money(r.cash)} ＋ 房產 ${money(r.landValue)} · 答對 ${r.correct}/${r.attempted}</div></div><div class="end-amount">${money(r.score)}</div></div>`).join('');
+    $('end-rankings').innerHTML=state.rankings.map((r,i)=>`<div class="end-row" style="${colorStyle(r)}"><strong>${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</strong><span class="avatar">${animalHtml(r.animal)}</span><div><strong><span class="person-color-dot"></span>${esc(r.name)}（${colorFor(r).name}）</strong><div class="end-stats">${r.titleId?esc(badgeFor(r.titleId)?.icon+' '+badgeFor(r.titleId)?.title)+' · ':''}現金 ${money(r.cash)} ＋ 房產 ${money(r.landValue)} · 答對 ${r.correct}/${r.attempted}</div></div><div class="end-amount">${money(r.score)}</div></div>`).join('');
     renderLearningFeedback();
+    renderEndAchievements();
     renderWrittenReflection();
     $('restart-btn').hidden=!isHost();
   }

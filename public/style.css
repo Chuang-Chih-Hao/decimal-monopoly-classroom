@@ -522,3 +522,43 @@
 .board .tile.tile-effect-active > .tile-ambient{
   visibility:hidden;
 }
+
+
+/* v1.7.0：全員觀戰猜題、命運／機會劇情選擇、冒險家成就 */
+.story-hint{font-size:13px;line-height:1.7;color:#576a7a;margin:9px 0 13px}
+.story-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.story-choice{display:flex;flex-direction:column;gap:7px;align-items:flex-start;text-align:left;min-width:0;min-height:136px;padding:14px;border-radius:15px;border:2px solid #cbdada;background:#f5faf9;color:#254c4b;transition:transform .18s ease,box-shadow .18s ease}
+.story-choice:nth-child(2){border-color:#e8cba4;background:#fff6e8;color:#725036}
+.story-choice strong{font-size:15px;font-weight:950}
+.story-choice span{font-size:12px;line-height:1.55;opacity:.88}
+.story-choice small{font-size:12px;line-height:1.7;font-weight:800;margin-top:auto}
+.story-choice:not(:disabled):hover{transform:translateY(-2px);box-shadow:0 8px 20px #283e4c20}
+.story-choice:not(:disabled):focus-visible{outline:3px solid #5c99bb;outline-offset:2px}
+.story-choice:disabled{opacity:.7;cursor:default}
+.question-panel .option-btn.spectator-selected{background:#e9f7ed;border-color:#5da68b;box-shadow:inset 0 0 0 1px #69ae94}
+.spectator-summary{margin-top:12px;padding:10px 12px;border-radius:10px;background:#e7f3fb;color:#2c5d80;font-weight:850;font-size:13px;line-height:1.65}
+.achievement-panel{border:1px solid #dbe8d7;background:linear-gradient(160deg,#fffdf5,#f3f9f0)}
+.achievement-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.achievement-heading h3{font-size:17px;margin:4px 0 0}
+.achievement-heading>span{background:#edf6e7;border-radius:99px;color:#547553;padding:5px 10px;font-size:12px;font-weight:900;white-space:nowrap}
+.achievement-current{margin:12px 0;font-size:12px;line-height:1.7;color:#5c6e68}
+.achievement-current strong{color:#28614e}
+.achievement-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.achievement-card{display:flex;flex-direction:column;align-items:center;text-align:center;gap:5px;padding:10px 7px;border:1px solid #dbe7de;background:#fff;border-radius:12px;min-width:0}
+.achievement-card .achievement-icon{font-size:25px;line-height:1.2}
+.achievement-card strong{font-size:12px;line-height:1.4}
+.achievement-card small{font-size:10px;color:#64786c;line-height:1.5;min-height:30px}
+.achievement-card.locked{filter:grayscale(.4);background:#f1f3ef;opacity:.68}
+.achievement-card.unlocked{border-color:#e3cc85;background:#fffdf2}
+.achievement-equip,.achievement-pending{margin-top:auto;display:inline-block;border-radius:7px;font-weight:850;font-size:10px;padding:5px 7px}
+.achievement-equip{background:#2e8070;color:#fff;border:0;min-height:26px}
+.achievement-equip:not(:disabled):hover{background:#226a5c}
+.achievement-equip:disabled{background:#e2f0e6;color:#396958;cursor:default}
+.achievement-pending{color:#809087}
+.rank-title{display:inline-block;margin-left:4px;border-radius:6px;background:#fff0c7;color:#80601b;padding:1px 4px;font-size:10px;font-weight:900}
+.end-achievements{margin:22px auto;padding:14px 18px;max-width:650px;border-radius:16px;background:#fff9df;text-align:left}
+.end-achievements h3{margin:0 0 11px;font-size:18px}
+.end-badges{display:flex;gap:8px;flex-wrap:wrap}
+.end-badge{display:inline-block;padding:7px 10px;background:#fff;border:1px solid #e9dab1;border-radius:99px;font-size:12px;font-weight:850}
+@media(max-width:480px){.story-choices{grid-template-columns:1fr}.story-choice{min-height:114px}.achievement-grid{gap:6px}.achievement-card{padding:9px 5px}}
+@media(prefers-reduced-motion:reduce){.story-choice{transition:none!important}}

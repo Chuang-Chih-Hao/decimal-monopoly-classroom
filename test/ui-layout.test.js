@@ -202,3 +202,35 @@ test('格子動畫期間隱藏原主圖及常駐裝飾，完成或中斷後自�
   assert.ok(app.includes('for(const tileId of tileEffectTimers.keys())clearTileEffect(tileId)'),'棋盤重繪前應清理動畫');
   assert.doesNotMatch(style,/\.tile-effect-active > \.tile-name\s*\{/,'格子名稱仍應保留');
 });
+
+// v1.7.0：觀戰猜題、劇情分支、成就稱號介面。
+test('v1.7 觀戰猜題在問題面板有獨立的選項事件，且不使用正式 answer 事件提交',()=>{
+  assert.ok(app.includes("request('spectatorGuess',{index:Number(btn.dataset.spectatorChoice)}"));
+  assert.ok(app.includes('data-spectator-choice'));
+  assert.ok(app.includes('spectatorPoll'));
+  assert.ok(app.includes('spectator-summary'));
+  assert.ok(app.includes('poll.correctCount'));
+  assert.ok(!app.includes("request('answer',{index:Number(btn.dataset.spectatorChoice)}"));
+});
+
+test('v1.7 劇情選擇可顯示兩條分支與風險、逾時提示，只有當回合玩家能送出',()=>{
+  const css=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
+  assert.ok(app.includes("p.type==='story'"));
+  assert.ok(app.includes("request('storyChoice',{choiceId:btn.dataset.storyChoice}"));
+  assert.ok(app.includes('data-story-choice'));
+  assert.ok(app.includes('逾時自動採取穩健方案'));
+  assert.match(css,/\.story-choices\s*\{/);
+  assert.match(css,/\.story-choice:disabled/);
+});
+
+test('v1.7 成就面板和結算徽章存在，稱號可以從已解鎖的成就裝備',()=>{
+  const css=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
+  assert.ok(index.includes('id="achievement-panel"'));
+  assert.ok(index.includes('id="end-achievements"'));
+  assert.ok(app.includes('function renderAchievements()'));
+  assert.ok(app.includes('function renderEndAchievements()'));
+  assert.ok(app.includes("request('equipTitle',{achievementId}"));
+  assert.ok(app.includes('achievementCatalog'));
+  assert.ok(app.includes('rank-title'));
+  assert.match(css,/\.achievement-grid\s*\{/);
+});

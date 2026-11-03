@@ -10,6 +10,29 @@ const DUEL_SECONDS = 25; // 每次小遊戲出招時間；不影響主題數學�
 const GAME_MINUTES = 30;
 const LOBBY_DEFAULTS = Object.freeze({rounds:'unlimited',money:900,questionSeconds:120,durationMinutes:30});
 const MAX_REFLECTION_LENGTH = 600;
+const STORY_SECONDS = 25;
+const ACHIEVEMENTS = Object.freeze([
+  {id:'first_answer',icon:'🌟',title:'小數新星',description:'正式答對第 1 道數學題'},
+  {id:'three_correct',icon:'🧮',title:'計算達人',description:'正式累積答對 3 道數學題'},
+  {id:'discount_master',icon:'🏷️',title:'折扣高手',description:'正式答對 2 題折扣類題目'},
+  {id:'unit_detective',icon:'🔎',title:'比價偵探',description:'正式答對 2 題單價比價類題目'},
+  {id:'first_property',icon:'🏠',title:'店面新星',description:'成功購買第一間店面'},
+  {id:'three_properties',icon:'🏘️',title:'島嶼經營家',description:'累積擁有 3 間店面'},
+  {id:'spectator_star',icon:'👀',title:'觀戰智多星',description:'觀戰猜題累積猜對 3 題'},
+  {id:'story_brave',icon:'🔮',title:'命運冒險家',description:'在命運或機會事件選過冒險方案'}
+]);
+const STORY_DESCRIPTIONS = Object.freeze({
+  '校園園遊會':'熱鬧的園遊會開始了，攤主邀請你挑戰神祕紅包。你想穩穩解題，還是冒險爭取更大的獎勵？',
+  '買一送一好運':'商店正舉辦限時活動，工作人員拿出兩個不同風險的優惠信封。',
+  '幸運發票':'你撿到一張可以兌換獎勵的發票，卻不確定裡面的幸運金額。',
+  '好心有好報':'你在島上幫忙整理物資，村長問你要選固定感謝禮，還是神祕加碼。',
+  '交通卡儲值禮':'車站出現兩台儲值機，一台獎勵穩定，另一台可能送出更大驚喜。',
+  '雨天小插曲':'突如其來的暴雨弄濕了冒險裝備，你可以簡單修補或挑戰高回報的修復任務。',
+  '抽中小禮物':'命運轉盤送來一份包裹，你可以安全領取，或打開帶有未知費用的特別禮物。',
+  '水壺不見了':'探險途中水壺不見了！選擇穩健地尋找，或接受神祕人的高風險尋物挑戰。',
+  '友情應援金':'朋友願意支援你的冒險，但你得決定領取基本物資或試試加倍挑戰。',
+  '巴士誤點':'巴士因天候延誤，站務員提供兩種不同風險的補償計畫。'
+});
 const ROOM_TTL_MS = 8 * 60 * 60 * 1000;
 const EVENT_CARDS = {
   chance: [
@@ -82,7 +105,7 @@ class GameManager {
       turnIndex:0, round:1, roundLimit:12, startMoney:900,
       questionSeconds:QUESTION_SECONDS,durationMinutes:GAME_MINUTES,endsAt:null,bonusStage:0,
       settings:{...LOBBY_DEFAULTS},
-      duel:null,lastDuel:null,
+      duel:null,lastDuel:null,poll:null,lastPoll:null,lastAchievement:null,
       board: BOARD, properties:{}, pending:null, phase:'lobby',
       lastRoll:null, lastResult:null, log:[], questionQueues:{},
       updatedAt:Date.now(), createdAt:Date.now(), rankings:[]
@@ -107,7 +130,8 @@ class GameManager {
   makePlayer(name, animal, host=false) {
     return { id:randomUUID(), token:randomBytes(24).toString('hex'), name, animal,
       host, connected:true, socketId:null, cash:0, properties:[], position:0,
-      missedTurns:0, correct:0, attempted:0, answerHistory:[],reflection:null };
+      missedTurns:0, correct:0, attempted:0, answerHistory:[],reflection:null,
+       achievements:[],titleId:null,spectatorCorrect:0,spectatorAttempted:0 };
   }
 
   join(code, name, animal) {
@@ -181,12 +205,89 @@ class GameManager {
     room.status='playing'; room.phase='rolling'; room.round=1; room.roundLimit=limit;
     room.startMoney=money;room.questionSeconds=questionSeconds;
     room.durationMinutes=durationMinutes;room.endsAt=Date.now()+durationMinutes*60*1000;
-    room.bonusStage=0;room.duel=null;room.lastDuel=null;
+    room.bonusStage=0;room.duel=null;room.lastDuel=null;room.poll=null;room.lastPoll=null;room.lastAchievement=null;
     room.turnIndex=0; room.currentPlayerId=room.players[0].id;
     room.properties={}; room.pending=null; room.lastRoll=null; room.lastResult=null;
     room.questionQueues={}; room.rankings=[];
-    room.players.forEach(p=>{p.cash=money;p.properties=[];p.position=0;p.correct=0;p.attempted=0;p.answerHistory=[];p.reflection=null;p.missedTurns=0;});
+    room.players.forEach(p=>{p.cash=money;p.properties=[];p.position=0;p.correct=0;p.attempted=0;p.answerHistory=[];p.reflection=null;p.missedTurns=0;p.achievements=[];p.titleId=null;p.spectatorCorrect=0;p.spectatorAttempted=0;});
     message(room, `🎉 遊戲開始！每人獲得 $${money}，每題 ${questionSeconds} 秒，${unlimited?'無輪數上限':'最多 '+limit+' 輪'}，${durationMinutes} 分鐘後結算（房主也可提前結束）。${room.players[0].name} 先擲骰。`);
+  }
+
+
+  unlockAchievement(room,player,id) {
+    const entry=ACHIEVEMENTS.find(a=>a.id===id);
+    if(!entry || player.achievements.includes(id))return false;
+    player.achievements.push(id);
+    if(!player.titleId)player.titleId=id;
+    room.lastAchievement={id:randomUUID(),playerId:player.id,achievementId:id,at:Date.now()};
+    message(room,'🏅 '+player.name+' 解鎖成就「'+entry.title+'」！');
+    return true;
+  }
+
+  checkAchievements(room,player) {
+    if(player.correct>=1)this.unlockAchievement(room,player,'first_answer');
+    if(player.correct>=3)this.unlockAchievement(room,player,'three_correct');
+    const countSkill=skill=>player.answerHistory.filter(x=>x.result==='correct'&&x.skill===skill).length;
+    if(countSkill('discount')>=2)this.unlockAchievement(room,player,'discount_master');
+    if(countSkill('unit')>=2)this.unlockAchievement(room,player,'unit_detective');
+    if(player.properties.length>=1)this.unlockAchievement(room,player,'first_property');
+    if(player.properties.length>=3)this.unlockAchievement(room,player,'three_properties');
+    if(player.spectatorCorrect>=3)this.unlockAchievement(room,player,'spectator_star');
+  }
+
+  equipTitle(room,playerId,achievementId) {
+    if(!['playing','finished'].includes(room.status))throw new GameError('遊戲開始後才能選擇稱號。');
+    const player=room.players.find(p=>p.id===playerId);
+    if(!player)throw new GameError('玩家身分失效。');
+    if(!player.achievements.includes(achievementId))throw new GameError('這個稱號尚未解鎖。');
+    player.titleId=achievementId;
+    room.updatedAt=Date.now();
+  }
+
+  spectatorGuess(room,playerId,choice) {
+    if(room.status!=='playing'||room.phase!=='answering'||!room.pending?.question||!room.poll)
+      throw new GameError('現在沒有開放的觀戰猜題。');
+    const player=room.players.find(p=>p.id===playerId);
+    if(!player||player.id===room.currentPlayerId)throw new GameError('當回合玩家請使用正式答題區。');
+    if(!Number.isInteger(choice)||choice<0||choice>=4)throw new GameError('請選擇有效選項。');
+    if(Date.now()>room.pending.expiresAt)throw new GameError('這一題已經結束猜題。');
+    if(Object.hasOwn(room.poll.choices,playerId))throw new GameError('本題已猜過，不能更改。');
+    room.poll.choices[playerId]=choice;
+    room.updatedAt=Date.now();
+  }
+
+  beginStory(room,kind,card,tile) {
+    const normalSuccess=card.success,normalFail=card.fail;
+    const safeSuccess=normalSuccess>=0?Math.max(15,Math.round(normalSuccess*.65)):-10;
+    const safeFail=Math.max(-20,normalFail);
+    const boldSuccess=normalSuccess>=0?normalSuccess+20:35;
+    room.phase='story';
+    room.pending={
+      type:'story',cardType:kind,card:{...card},tileId:tile.id,
+      scene:STORY_DESCRIPTIONS[card.title]||'神祕事件發生了！你要選擇穩健還是冒險的方式迎接挑戰？',
+      choices:[
+        {id:'safe',label:'🛡️ 穩健處理',detail:'獎勵較少，失敗損失也比較低。',success:safeSuccess,fail:safeFail},
+        {id:'bold',label:'🎲 冒險挑戰',detail:'答對有較多獎勵，但答錯承擔原事件風險。',success:boldSuccess,fail:normalFail}
+      ],expiresAt:Date.now()+STORY_SECONDS*1000
+    };
+    room.poll=null;
+    message(room,'📜 '+room.players.find(p=>p.id===room.currentPlayerId).name+' 遇到「'+card.title+'」，準備選擇命運分支！');
+  }
+
+  chooseStory(room,playerId,choiceId,automatic=false) {
+    const player=requireTurn(room,playerId);
+    if(room.phase!=='story'||room.pending?.type!=='story')throw new GameError('目前沒有需要選擇的劇情事件。');
+    const pending=room.pending;
+    if(!automatic&&Date.now()>pending.expiresAt)throw new GameError('選擇時間已過，將自動採用穩健方案。');
+    const choice=pending.choices.find(c=>c.id===choiceId);
+    if(!choice)throw new GameError('請選擇畫面上的劇情分支。');
+    const context={card:{
+      title:pending.card.title,detail:pending.card.detail,scene:pending.scene,
+      choiceLabel:choice.label,success:choice.success,fail:choice.fail
+    }};
+    message(room,'📜 '+player.name+' 選擇「'+choice.label+'」，接著挑戰一道數學題。');
+    if(choice.id==='bold')this.unlockAchievement(room,player,'story_brave');
+    this.ask(room,pending.cardType,context,{label:pending.card.title});
   }
 
   takeQuestion(room, kind) {
@@ -203,11 +304,14 @@ class GameManager {
   }
 
   ask(room,kind,context={},opts={}) {
+    const question=this.takeQuestion(room,kind);
     room.pending={
-      type:kind, question:this.takeQuestion(room,kind), context,
+      type:kind, question, context,
       stage:opts.stage ?? 1, total:opts.total ?? 1, correctCount:opts.correctCount ?? 0,
       expiresAt: Date.now()+room.questionSeconds*1000
     };
+    room.poll={id:randomUUID(),questionId:question.id,actorId:room.currentPlayerId,choices:{}};
+    room.lastPoll=null;
     room.phase='answering';
     message(room, `📖 ${room.players.find(p=>p.id===room.currentPlayerId)?.name} 遇到「${opts.label || BOARD[room.players.find(p=>p.id===room.currentPlayerId).position].name}」：請回答小數題！`);
   }
@@ -267,7 +371,7 @@ class GameManager {
     }
     if(type==='chance' || type==='fate') {
       const card=shuffle(EVENT_CARDS[type])[0];
-      this.ask(room,type,{card}, {label:`${tile.name}｜${card.title}`});
+      this.beginStory(room,type,card,tile);
       return;
     }
     this.ask(room,type,{}, {label:tile.name,total:type==='boss'?2:1});
@@ -293,7 +397,24 @@ class GameManager {
       player.answerHistory.push({questionId:q.id,skill:BANK[q.kind]?.find(item=>item.id===q.id)?.skill||'multi',
         result:correct?'correct':reason==='timeout'?'timeout':'wrong',at:Date.now()});
     }
+    if(room.poll){
+      if(reason!=='skipped'){
+        const entries=Object.entries(room.poll.choices);
+        const correctCount=entries.filter(([,index])=>index===q.correctIndex).length;
+        room.lastPoll={id:room.poll.id,questionId:room.poll.questionId,total:entries.length,correctCount,
+          byViewer:Object.fromEntries(entries.map(([id,index])=>[id,index===q.correctIndex]))};
+        for(const [id,index] of entries){
+          const spectator=room.players.find(p=>p.id===id);
+          if(!spectator)continue;
+          spectator.spectatorAttempted++;
+          if(index===q.correctIndex)spectator.spectatorCorrect++;
+          this.checkAchievements(room,spectator);
+        }
+      }else room.lastPoll=null;
+    }
+    room.poll=null;
     room.pending=null;
+    if(reason!=='skipped')this.checkAchievements(room,player);
     const result={correct,correctAnswer:q.correctText,explanation:q.explanation,at:Date.now()};
     room.lastResult=result;
     message(room,reason==='skipped'
@@ -355,6 +476,7 @@ class GameManager {
       : (rules[pending.type]?.[correct?0:1] ?? 0);
     const bonus=correct?room.bonusStage*15:0;
     const actual=changeCash(player,delta+bonus);
+    if(pending.context.card)message(room,'🎴 '+player.name+' 的「'+pending.context.card.title+'」分支「'+pending.context.card.choiceLabel+'」已揭曉。');
     message(room, `${correct?'🌟':'📦'} ${player.name} ${actual>0?`獲得 $${actual}`:actual<0?`失去 $${-actual}`:'金額不變'}${bonus?`（含終盤加碼 $${bonus}）`:''}。`);
     room.phase='between';
   }
@@ -438,6 +560,7 @@ class GameManager {
       changeCash(player,-tile.price);
       player.properties.push(tile.id);
       room.properties[tile.id]=player.id;
+      this.checkAchievements(room,player);
       message(room, `🎉 ${player.name} 以 $${tile.price} 買下「${tile.name}」！其他玩家經過需付 $${tile.rent}。`);
     } else message(room, `↪️ ${player.name} 放棄購買「${tile.name}」。`);
     room.pending=null; room.phase='between';
@@ -453,10 +576,11 @@ class GameManager {
       // Boss 第一關失敗後會進入第二題，再跳一次可完成。
       if(room.phase==='answering' && room.pending) this.resolveAnswer(room,current,false,{reason:'skipped'});
     }
+    if(hostOverride && room.phase==='story')message(room,'⏭️ 房主略過本次劇情事件。');
     if(hostOverride && room.phase==='buying') room.pending=null;
     if(hostOverride && room.phase==='duel') {room.duel=null;message(room,'⏭️ 房主略過雙人對戰，本次不額外轉帳。');}
     if(hostOverride && room.phase==='rolling') message(room,'⏭️ 房主跳過本次擲骰。');
-    room.pending=null;
+    room.pending=null;room.poll=null;
     room.phase='rolling';
     if(room.endsAt && Date.now()>=room.endsAt){this.finish(room);return;}
     room.turnIndex++;
@@ -496,11 +620,11 @@ class GameManager {
 
   finish(room) {
     room.status='finished';room.phase='finished';room.currentPlayerId=null;
-    room.pending=null;room.duel=null;
+    room.pending=null;room.duel=null;room.poll=null;
     room.rankings=room.players.map(p=>({id:p.id,name:p.name,animal:p.animal,
       cash:p.cash,landValue:p.properties.reduce((v,id)=>v+BOARD[id].price,0),
       score:p.cash+p.properties.reduce((v,id)=>v+BOARD[id].price,0),
-      correct:p.correct,attempted:p.attempted})).sort((a,b)=>b.score-a.score||b.correct-a.correct);
+      correct:p.correct,attempted:p.attempted,titleId:p.titleId,achievements:p.achievements.length})).sort((a,b)=>b.score-a.score||b.correct-a.correct);
     message(room, `🏆 遊戲結束！總資產最高的是 ${room.rankings[0].name}（$${room.rankings[0].score}）！`);
   }
 
@@ -515,8 +639,8 @@ class GameManager {
     if(room.status!=='finished') throw new GameError('請先結束這一局。');
     room.status='lobby';room.phase='lobby';room.currentPlayerId=null;
     room.round=1;room.rankings=[];room.pending=null;room.properties={};
-    room.lastRoll=null;room.lastResult=null;room.duel=null;room.lastDuel=null;room.endsAt=null;room.bonusStage=0;room.questionQueues={};
-    room.players.forEach(p=>{p.cash=0;p.properties=[];p.position=0;p.missedTurns=0;p.correct=0;p.attempted=0;p.answerHistory=[];p.reflection=null;});
+    room.lastRoll=null;room.lastResult=null;room.duel=null;room.lastDuel=null;room.endsAt=null;room.bonusStage=0;room.questionQueues={};room.poll=null;room.lastPoll=null;room.lastAchievement=null;
+    room.players.forEach(p=>{p.cash=0;p.properties=[];p.position=0;p.missedTurns=0;p.correct=0;p.attempted=0;p.answerHistory=[];p.reflection=null;p.achievements=[];p.titleId=null;p.spectatorCorrect=0;p.spectatorAttempted=0;});
     message(room,'🔁 房主已開啟下一局，所有玩家保留座位。');
   }
 
@@ -530,7 +654,14 @@ class GameManager {
       durationMinutes:room.durationMinutes,endsAt:room.endsAt,questionSeconds:room.questionSeconds,bonusStage:room.bonusStage,
       players:room.players.map(p=>({id:p.id,name:p.name,animal:p.animal,host:p.host,
         connected:p.connected,cash:p.cash,properties:p.properties,position:p.position,
-        missedTurns:p.missedTurns,correct:p.correct,attempted:p.attempted})),
+        missedTurns:p.missedTurns,correct:p.correct,attempted:p.attempted,
+        achievements:[...p.achievements],titleId:p.titleId})),
+      achievementCatalog:ACHIEVEMENTS,lastAchievement:room.lastAchievement,
+      mySpectatorScore:(()=>{const mine=room.players.find(p=>p.id===viewerId);return mine?{correct:mine.spectatorCorrect,attempted:mine.spectatorAttempted}:null;})(),
+      spectatorPoll:room.poll?{id:room.poll.id,total:Math.max(0,room.players.length-1),submitted:Object.keys(room.poll.choices).length,
+        myChoice:viewerId&&Object.hasOwn(room.poll.choices,viewerId)?room.poll.choices[viewerId]:null}:null,
+      lastPoll:room.lastPoll?{id:room.lastPoll.id,questionId:room.lastPoll.questionId,total:room.lastPoll.total,
+        correctCount:room.lastPoll.correctCount,myCorrect:viewerId&&Object.hasOwn(room.lastPoll.byViewer,viewerId)?room.lastPoll.byViewer[viewerId]:null}:null,
       board:BOARD,properties:room.properties,lastRoll:room.lastRoll,lastResult:room.lastResult,lastDuel:room.lastDuel,
       duel:room.duel&&{id:room.duel.id,mode:room.duel.mode,round:room.duel.round,maxRounds:room.duel.maxRounds,
         renterId:room.duel.renterId,ownerId:room.duel.ownerId,attackerId:room.duel.attackerId,tileId:room.duel.tileId,
@@ -538,6 +669,9 @@ class GameManager {
         expiresAt:room.duel.expiresAt,stake:room.duel.stake,lastExchange:room.duel.lastExchange},
       pending:room.pending && (room.pending.type==='buying'
         ? {type:'buying',tileId:room.pending.tileId}
+        : room.pending.type==='story'
+          ? {type:'story',story:{title:room.pending.card.title,scene:room.pending.scene,
+              choices:room.pending.choices.map(({id,label,detail,success,fail})=>({id,label,detail,success,fail}))},expiresAt:room.pending.expiresAt}
         : {type:room.pending.type,stage:room.pending.stage,total:room.pending.total,
            card:room.pending.context?.card
              ? {title:room.pending.context.card.title,detail:room.pending.context.card.detail} : null,
@@ -565,7 +699,10 @@ class GameManager {
         message(room,step===1?'✨ 中場加碼！之後數學挑戰答對額外獎勵 $15。':'🚀 最後衝刺！數學挑戰答對額外獎勵 $30，小遊戲補貼上限提高到 $60。');
         changed=true;
       }
-      if(room.pending?.expiresAt && room.pending.expiresAt<=now){
+      if(room.phase==='story'&&room.pending?.expiresAt<=now){
+        this.chooseStory(room,room.currentPlayerId,'safe',true);changed=true;
+      }
+      if(room.phase==='answering'&&room.pending?.expiresAt && room.pending.expiresAt<=now){
         const p=room.players.find(p=>p.id===room.currentPlayerId);
         if(p){message(room,'⏰ 作答時間到，按未答對處理。');this.resolveAnswer(room,p,false,{reason:'timeout'});changed=true;}
       }

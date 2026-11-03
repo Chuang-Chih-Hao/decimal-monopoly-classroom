@@ -91,6 +91,15 @@ io.on('connection',(socket)=>{
   socket.on('answer',action(({index})=>{
     const {room,playerId}=identity();games.answer(room,playerId,index);broadcast(room);
   }));
+  socket.on('spectatorGuess',action(({index})=>{
+    const {room,playerId}=identity();games.spectatorGuess(room,playerId,index);broadcast(room);
+  }));
+  socket.on('storyChoice',action(({choiceId})=>{
+    const {room,playerId}=identity();games.chooseStory(room,playerId,choiceId);broadcast(room);
+  }));
+  socket.on('equipTitle',action(({achievementId})=>{
+    const {room,playerId}=identity();games.equipTitle(room,playerId,achievementId);broadcast(room);
+  }));
   socket.on('duelChoice',action(({choice})=>{
     const {room,playerId}=identity();games.duelChoice(room,playerId,choice);broadcast(room);
   }));
