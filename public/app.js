@@ -1,13 +1,13 @@
 /* 小數富翁前端：所有資產、擲骰、判分都以伺服器狀態為準。 */
 (() => {
   'use strict';
-  const CLIENT_VERSION='1.6.1';
+  const CLIENT_VERSION='1.6.2';
   const socket=io({transports:['websocket','polling'],reconnection:true});
   const $=id=>document.getElementById(id);
   const esc=(value)=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const money=n=>`$${Number(n||0).toLocaleString('zh-TW')}`;
-  const animals=['capybara','🐈','🐕','🐰','🦊','🐼','🐸','🐧','🦁','🐻','🐹','🐨'];
-  const animalNames=['水豚','貓','狗','兔子','狐狸','貓熊','青蛙','企鵝','獅子','熊','倉鼠','無尾熊'];
+  const animals=['capybara','🐈','🐕','🐰','🦊','🐼','🐸','🐧','🦁','🐢','🐹','🦉'];
+  const animalNames=['水豚','貓','狗','兔子','狐狸','貓熊','青蛙','企鵝','獅子','烏龜','倉鼠','貓頭鷹'];
   // 停在格子時採用 v1.5 原始動物圖示；只有移動過程放大成跳躍動物。
   const animalHtml=a=>a==='capybara'?'<img class="animal-img" src="/capybara.svg" alt="水豚" />':esc(a);
   const diceIcons=['','⚀','⚁','⚂','⚃','⚄','⚅'];

@@ -31,5 +31,5 @@ const BOARD = [
   { id:28,type:'boss',name:'逆轉大魔王',icon:'👾',tip:'終盤兩題挑戰' },
   { id:29,type:'fate',name:'命運大轉盤',icon:'🎡',tip:'意外驚喜事件' },
 ];
-const ANIMALS = ['capybara','🐈','🐕','🐰','🦊','🐼','🐸','🐧','🦁','🐻','🐹','🐨'];
+const ANIMALS = ['capybara','🐈','🐕','🐰','🦊','🐼','🐸','🐧','🦁','🐢','🐹','🦉'];
 module.exports={ BOARD, ANIMALS };

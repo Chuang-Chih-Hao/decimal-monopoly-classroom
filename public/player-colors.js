@@ -15,9 +15,9 @@
     '🐸': Object.freeze({ hex: '#20835F', light: '#DFF5E9', name: '綠色' }),
     '🐧': Object.freeze({ hex: '#167E90', light: '#D9F3F6', name: '青色' }),
     '🦁': Object.freeze({ hex: '#A37405', light: '#F9EEC6', name: '金黃色' }),
-    '🐻': Object.freeze({ hex: '#734F36', light: '#EDE3D9', name: '深棕色' }),
+    '🐢': Object.freeze({ hex: '#734F36', light: '#EDE3D9', name: '深棕色' }),
     '🐹': Object.freeze({ hex: '#C14C39', light: '#F9E4DD', name: '紅色' }),
-    '🐨': Object.freeze({ hex: '#5658AD', light: '#E7E8FC', name: '靛色' }),
+    '🦉': Object.freeze({ hex: '#5658AD', light: '#E7E8FC', name: '靛色' }),
   });
   function forAnimal(animal) { return COLORS[animal] || Object.freeze({ hex: '#586B78', light: '#EFF2F4', name: '灰色' }); }
   return Object.freeze({ COLORS, forAnimal });

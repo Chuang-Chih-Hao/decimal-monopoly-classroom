@@ -114,3 +114,21 @@ test('防快取版本與套件版本一致',()=>{
   assert.ok(index.includes(`/style.css?v=${version}`));
   assert.ok(app.includes(`const CLIENT_VERSION='${version}'`));
 });
+
+
+// v1.6.2：全房間使用同一份動物合法清單，不再包含易混淆的熊類。
+test('12 種選角動物物種不重複，前後端清單與配色同步',()=>{
+  const expected=['capybara','🐈','🐕','🐰','🦊','🐼','🐸','🐧','🦁','🐢','🐹','🦉'];
+  const names=['水豚','貓','狗','兔子','狐狸','貓熊','青蛙','企鵝','獅子','烏龜','倉鼠','貓頭鷹'];
+  assert.deepEqual(ANIMALS,expected);
+  assert.equal(new Set(ANIMALS).size,12);
+  assert.ok(!ANIMALS.includes('🐻'));
+  assert.ok(!ANIMALS.includes('🐨'));
+  const parsedList=app.match(/const animals=\[([^\]]+)\]/)?.[1];
+  const parsedNames=app.match(/const animalNames=\[([^\]]+)\]/)?.[1];
+  assert.ok(parsedList,'前端動物清單必須存在');
+  assert.ok(parsedNames,'前端動物名稱必須存在');
+  assert.deepEqual([...parsedList.matchAll(/'([^']+)'/g)].map(x=>x[1]),expected);
+  assert.deepEqual([...parsedNames.matchAll(/'([^']+)'/g)].map(x=>x[1]),names);
+  assert.deepEqual(Object.keys(palette.COLORS),expected);
+});
