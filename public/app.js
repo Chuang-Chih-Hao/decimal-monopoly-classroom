@@ -9,9 +9,14 @@
   const animalNames=['水豚','貓','狗','兔子','狐狸','貓熊','青蛙','企鵝','獅子','熊','倉鼠','無尾熊'];
   const animalHtml=a=>a==='capybara'?'<img class="animal-img" src="/capybara.svg" alt="水豚" />':esc(a);
   const diceIcons=['','⚀','⚁','⚂','⚃','⚄','⚅'];
+  const layout=window.DecimalBoardLayout;
+  const playerColors=window.DecimalPlayerColors;
+  if(!layout||!playerColors)throw new Error('棋盤版型與動物配色未載入');
+  const colorFor=p=>playerColors.forAnimal(p?.animal);
+  const colorStyle=p=>`--player-color:${colorFor(p).hex};--player-light:${colorFor(p).light}`;
   const typeNames={purchase:'購地數學考驗',calc:'小數神算',discount:'折扣挑戰',compare:'比價擂台',scam:'破解黑心商人',chest:'寶箱密碼',chance:'機會卡',fate:'命運卡',boss:'終極 Boss',rescue:'緊急救援'};
   let selectedAnimal='capybara';
-  let mapZoom=window.innerWidth>=980?.75:1;
+  let mapZoom=1;
   let mapFocusKey=null;
   let state=null,me=null;
   let toastTimer;
@@ -38,7 +43,7 @@
   }
   function clearSession(){
     animationNonce++;activeRollAnimation=null;deferredFeedback=null;
-    seenRollId=null;seenLogId=null;seenDuelResultId=null;mapFocusKey=null;
+    seenRollId=null;seenLogId=null;seenDuelResultId=null;mapFocusKey=null;mapZoom=1;
     $('event-spotlight').hidden=true;
     tokenData=null;me=null;state=null;
     try{localStorage.removeItem('decimal-monopoly-session');}catch{}
@@ -47,7 +52,7 @@
   // 首次加入／重新連線時，以伺服器畫面為準，不重播已經結束的擲骰。
   function setInitialState(next){
     animationNonce++;activeRollAnimation=null;deferredFeedback=null;
-    state=next;
+    state=next;mapFocusKey=null;
     seenRollId=next.lastRoll?.id??null;
     seenDuelResultId=next.lastDuel?.id??null;
     seenLogId=next.log?.[0]?.id??null;
@@ -114,13 +119,63 @@
     animals.forEach((a,i)=>{
       const btn=document.createElement('button');btn.type='button';btn.className='animal-option'+(a===selectedAnimal?' selected':'');
       btn.title=animalNames[i];btn.setAttribute('aria-label',animalNames[i]);btn.setAttribute('aria-pressed',String(a===selectedAnimal));
-      btn.innerHTML=animalHtml(a);
+      const paint=playerColors.forAnimal(a);
+      btn.style.cssText=`--player-color:${paint.hex};--player-light:${paint.light}`;
+      btn.innerHTML=`<span class="animal-option-icon">${animalHtml(a)}</span><span class="animal-color-dot" aria-hidden="true"></span>`;
+      btn.title=`${animalNames[i]}｜${paint.name}`;
       btn.addEventListener('click',()=>{selectedAnimal=a;renderAnimalPicker();});picker.appendChild(btn);
     });
   }
   renderAnimalPicker();
-  $('map-overview').addEventListener('click',()=>{if(activeRollAnimation){showToast('請等角色移動完成再切換地圖大小。');return;}mapZoom=.68;if(state?.status==='playing')renderBoard();});
-  $('map-fullsize').addEventListener('click',()=>{if(activeRollAnimation){showToast('請等角色移動完成再切換地圖大小。');return;}mapZoom=1;if(state?.status==='playing')renderBoard();});
+  const boardWrapper=$('board-wrapper');
+  const clampZoom=value=>Math.min(1.65,Math.max(.25,Math.round(value*100)/100));
+  function setMapZoom(value,{keepCenter=true}={}){
+    const board=$('board');
+    const oldZoom=mapZoom;
+    const oldLeft=boardWrapper.scrollLeft,oldTop=boardWrapper.scrollTop;
+    mapZoom=clampZoom(value);
+    board.style.zoom=String(mapZoom);
+    $('map-zoom-label').textContent=`${Math.round(mapZoom*100)}%`;
+    if(keepCenter && oldZoom>0){
+      boardWrapper.scrollLeft=(oldLeft+boardWrapper.clientWidth/2)*mapZoom/oldZoom-boardWrapper.clientWidth/2;
+      boardWrapper.scrollTop=(oldTop+boardWrapper.clientHeight/2)*mapZoom/oldZoom-boardWrapper.clientHeight/2;
+    }
+  }
+  function adjustZoom(value){
+    if(activeRollAnimation){showToast('棋子移動結束後就能自由縮放。');return;}
+    setMapZoom(value);
+  }
+  $('map-overview').addEventListener('click',()=>{
+    if(activeRollAnimation){showToast('棋子移動結束後就能切換全覽。');return;}
+    const x=(boardWrapper.clientWidth-24)/layout.WIDTH;
+    const y=(Math.min(boardWrapper.clientHeight||590,window.innerWidth<=650?480:590)-24)/layout.HEIGHT;
+    setMapZoom(Math.min(.96,x,y),{keepCenter:false});
+    boardWrapper.scrollTo({left:0,top:0,behavior:'auto'});
+  });
+  $('map-zoom-in').addEventListener('click',()=>adjustZoom(mapZoom+.15));
+  $('map-zoom-out').addEventListener('click',()=>adjustZoom(mapZoom-.15));
+  $('map-fullsize').addEventListener('click',()=>{
+    if(activeRollAnimation){showToast('棋子移動結束後即可重新聚焦。');return;}
+    setMapZoom(Math.max(1,mapZoom));
+    focusMapTile(activePlayer()?.position??0,'smooth');
+  });
+  // 電腦可按住滑鼠拖曳棋盤，手機和平板則使用原生觸控滑動。
+  let pan=null;
+  boardWrapper.addEventListener('pointerdown',e=>{
+    if(e.pointerType!=='mouse'||e.button!==0)return;
+    pan={id:e.pointerId,x:e.clientX,y:e.clientY,left:boardWrapper.scrollLeft,top:boardWrapper.scrollTop};
+    boardWrapper.classList.add('is-dragging');
+    boardWrapper.setPointerCapture(e.pointerId);
+  });
+  boardWrapper.addEventListener('pointermove',e=>{
+    if(!pan||pan.id!==e.pointerId)return;
+    boardWrapper.scrollLeft=pan.left+pan.x-e.clientX;
+    boardWrapper.scrollTop=pan.top+pan.y-e.clientY;
+  });
+  const finishPan=e=>{if(!pan||pan.id!==e.pointerId)return;pan=null;boardWrapper.classList.remove('is-dragging');};
+  boardWrapper.addEventListener('pointerup',finishPan);
+  boardWrapper.addEventListener('pointercancel',finishPan);
+  boardWrapper.addEventListener('lostpointercapture',()=>{pan=null;boardWrapper.classList.remove('is-dragging');});
   const prefill=new URLSearchParams(window.location.search).get('room');
   if(prefill)$('room-code').value=prefill.trim().toUpperCase().slice(0,6);
 
@@ -168,6 +223,10 @@
   socket.on('state',next=>{
     if(!me)return;
     const previous=state;
+    // 若房主在上一位角色移動動畫未播完就跳回合，立即停止舊動畫，避免鏡頭與新回合爭奪焦點。
+    if(previous?.currentPlayerId!==next.currentPlayerId&&activeRollAnimation){
+      animationNonce++;activeRollAnimation=null;deferredFeedback=null;
+    }
     const isNewRoll=next.status==='playing'&&!!next.lastRoll?.id&&next.lastRoll.id!==seenRollId;
     if(next.status!=='playing'){
       animationNonce++;activeRollAnimation=null;deferredFeedback=null;
@@ -198,7 +257,7 @@
     $('room-code-label').textContent=state.code;
     $('lobby-big-code').textContent=state.code;
     $('game-status-label').textContent=({lobby:'等待加入',playing:'遊戲進行中',finished:'已完成'})[state.status];
-    $('whoami').innerHTML=`${animalHtml(myPlayer()?.animal)} ${esc(myPlayer()?.name)}${isHost()?'・房主':''}`;
+    $('whoami').innerHTML=`<span class="identity-chip" style="${colorStyle(myPlayer())}">${animalHtml(myPlayer()?.animal)} ${esc(myPlayer()?.name)} <small>${colorFor(myPlayer()).name}</small>${isHost()?' 👑':''}</span>`;
     $('lobby-screen').hidden=state.status!=='lobby';
     $('playing-screen').hidden=state.status!=='playing';
     $('end-screen').hidden=state.status!=='finished';
@@ -210,91 +269,68 @@
     const list=$('lobby-slots');list.innerHTML='';
     for(let i=0;i<6;i++){
       const p=state.players[i];const div=document.createElement('div');div.className='lobby-slot'+(p?'':' empty');
+      if(p)div.style.cssText=colorStyle(p);
       div.innerHTML=p
-        ? `<div class="lobby-animal">${animalHtml(p.animal)}</div><div><div class="lobby-name">${esc(p.name)}${p.id===me?'（我）':''}</div><div class="lobby-meta">${p.host?'👑 房主':'冒險家'} · ${p.connected?'已連線':'暫時離線'}</div></div>`
+        ? `<div class="lobby-animal">${animalHtml(p.animal)}</div><div><div class="lobby-name">${esc(p.name)}${p.id===me?'（我）':''}</div><div class="lobby-meta">${colorFor(p).name}棋子 · ${p.host?'👑 房主':'冒險家'} · ${p.connected?'已連線':'暫時離線'}</div></div>`
         :`<div class="lobby-animal">➕</div><div><div class="lobby-name">等待加入</div><div class="lobby-meta">冒險席位 ${i+1}</div></div>`;
       list.appendChild(div);
     }
     $('host-settings').hidden=!isHost();$('guest-waiting').hidden=isHost();
     $('start-btn').disabled=state.players.length<2;
   }
-  // 等弧長取樣，產生 30 格非矩形、彎曲的環形車道。位置與道路都依同一份座標。
-  const trackWidth=1280,trackHeight=920;
-  const trackCache=new Map();
-  function trackFor(count){
-    if(trackCache.has(count))return trackCache.get(count);
-    const smooth=[];let total=0;const resolution=4800;
-    const position=t=>({x:640+510*Math.cos(t)+22*Math.sin(3*t),y:460+330*Math.sin(t)+34*Math.sin(2*t)});
-    const startAngle=2.44;
-    for(let i=0;i<=resolution;i++){
-      const p=position(startAngle+i*2*Math.PI/resolution);
-      if(i>0)total+=Math.hypot(p.x-smooth[i-1].x,p.y-smooth[i-1].y);
-      smooth.push({...p,len:total});
-    }
-    const points=[];let cursor=0;
-    for(let i=0;i<count;i++){
-      const target=total*i/count;
-      while(cursor+1<smooth.length && smooth[cursor+1].len<target)cursor++;
-      const a=smooth[cursor],b=smooth[cursor+1],f=(target-a.len)/(b.len-a.len||1);
-      points.push({x:a.x+(b.x-a.x)*f,y:a.y+(b.y-a.y)*f});
-    }
-    const n=points.length;
-    // Catmull–Rom 轉為封閉 Bézier，畫出連續的柔和曲線。
-    let path=`M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
-    for(let i=0;i<n;i++){
-      const p0=points[(i-1+n)%n],p1=points[i],p2=points[(i+1)%n],p3=points[(i+2)%n];
-      path+=` C ${(p1.x+(p2.x-p0.x)/6).toFixed(2)} ${(p1.y+(p2.y-p0.y)/6).toFixed(2)} ${(p2.x-(p3.x-p1.x)/6).toFixed(2)} ${(p2.y-(p3.y-p1.y)/6).toFixed(2)} ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
-    }
-    path+=' Z';const data={points,path};trackCache.set(count,data);return data;
-  }
+  // 30 格固定為 10 × 7 的傳統大富翁方格外圈；不變更伺服器的格子編號。
   function renderBoard(){
-    const board=$('board');board.innerHTML='';board.style.zoom=String(mapZoom);
-    const track=trackFor(state.board.length);
-    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
-    svg.setAttribute('viewBox',`0 0 ${trackWidth} ${trackHeight}`);
-    svg.setAttribute('preserveAspectRatio','none');svg.setAttribute('aria-hidden','true');svg.classList.add('road-svg');
-    svg.innerHTML=`<path d="${track.path}" class="road-border"/><path d="${track.path}" class="road-asphalt"/><path d="${track.path}" class="road-dashes"/>`;
-    board.appendChild(svg);
-    const decorative=document.createElement('div');decorative.className='road-decor';
-    decorative.innerHTML='<span class="road-tree tree-a">🌳</span><span class="road-tree tree-b">🌲</span><span class="road-tree tree-c">🌺</span><span class="road-tree tree-d">🌴</span><span class="road-tree tree-e">🍄</span>';
-    board.appendChild(decorative);
+    const board=$('board');board.replaceChildren();board.style.zoom=String(mapZoom);
+    if(state.board.length!==layout.COUNT)throw new Error('棋盤格數與版型不一致');
     state.board.forEach(tile=>{
-      const pos=track.points[tile.id],el=document.createElement('div');
-      el.className=`tile ${tile.type}${tile.group?' group-'+tile.group:''}${state.players.some(p=>p.position===tile.id && p.id!==activeRollAnimation?.playerId)?' active-tile':''}${state.properties[tile.id]?' owned':''}`;
-      el.dataset.tileId=String(tile.id);
-      el.style.left=`${pos.x/trackWidth*100}%`;
-      el.style.top=`${pos.y/trackHeight*100}%`;
-      el.title=tile.type==='property'?`${tile.name}：購地 ${money(tile.price)}，租金 ${money(tile.rent)}`:`${tile.name}：${tile.tip||''}`;
+      const {col,row}=layout.positionFor(tile.id),el=document.createElement('div');
       const owner=state.players.find(p=>p.id===state.properties[tile.id]);
-      const pawns=state.players.filter(p=>p.position===tile.id && p.id!==activeRollAnimation?.playerId);
+      const pawns=state.players.filter(p=>p.position===tile.id&&p.id!==activeRollAnimation?.playerId);
+      const currentPos=activeRollAnimation ? activeRollAnimation.from : activePlayer()?.position;
+      el.className=`tile ${tile.type}${tile.group?' group-'+tile.group:''}${pawns.length?' active-tile':''}${owner?' owned':''}${currentPos===tile.id?' current-turn-tile':''}${[0,9,15,24].includes(tile.id)?' board-corner':''}`;
+      el.dataset.tileId=String(tile.id);
+      el.style.left=`${(col+.5)*layout.CELL}px`;
+      el.style.top=`${(row+.5)*layout.CELL}px`;
+      if(owner)el.style.cssText+=`;${colorStyle(owner)}`;
+      el.title=tile.type==='property'?`${tile.name}：購地 ${money(tile.price)}，租金 ${money(tile.rent)}${owner?'，屋主 '+owner.name+'（'+colorFor(owner).name+'）':''}`:`${tile.name}：${tile.tip||''}`;
       el.innerHTML=`<span class="tile-number">${String(tile.id).padStart(2,'0')}</span><span class="tile-icon">${esc(tile.icon)}</span><span class="tile-name">${esc(tile.name)}</span>`
         +(tile.price?`<span class="tile-price">${money(tile.price)}</span>`:'')
-        +(owner?`<span class="owner-mini" title="${esc(owner.name)} 的房產">${animalHtml(owner.animal)}</span>`:'')
-        +`<div class="tile-pawns">${pawns.map(p=>`<span class="pawn" title="${esc(p.name)}">${animalHtml(p.animal)}</span>`).join('')}</div>`;
+        +(owner?`<span class="owner-mini" title="${esc(owner.name)} 的房產">${animalHtml(owner.animal)}<span>${esc(owner.name)}</span></span>`:'')
+        +`<div class="tile-pawns">${pawns.map(p=>`<span class="pawn${p.id===state.currentPlayerId?' pawn-current':''}" style="${colorStyle(p)}" title="${esc(p.name)}・${colorFor(p).name}">${animalHtml(p.animal)}</span>`).join('')}</div>`;
       board.appendChild(el);
     });
     const center=document.createElement('div');center.id='board-center';center.className='board-center';
-    const last=state.lastRoll;const who=last?state.players.find(p=>p.id===last.playerId):null;
-    const text=last?`${esc(who?.name||'玩家')} 擲出 ${last.die} 點！`:'30 格彎曲環島車道';
-    center.innerHTML=`<div class="center-content"><div class="center-logo">🌴 💰 🎲</div><div class="center-title">小數富翁<br/>探險島</div><div class="center-desc">${text}<br/>買店面・算折扣・雙人對戰</div>${last?`<span class="dice-face" aria-label="${last.die} 點">${diceIcons[last.die]}</span>`:''}</div>`;
+    const last=state.lastRoll,who=last?state.players.find(p=>p.id===last.playerId):null;
+    const current=activePlayer();
+    const description=last?`${esc(who?.name||'玩家')} 擲出 ${last.die} 點！`:'30 格經典方格棋盤';
+    center.innerHTML=`<div class="center-content"><div class="center-logo">🌴 💰 🎲</div><div class="center-title">小數富翁<br/>探險島</div><div class="center-desc">${description}<br/>買店面・算折扣・雙人對戰</div><div class="center-turn" style="${colorStyle(current)}">${animalHtml(current?.animal||'🐾')} 現在輪到 ${esc(current?.name||'冒險家')}</div>${last?`<span class="dice-face" aria-label="${last.die} 點">${diceIcons[last.die]}</span>`:''}</div>`;
     board.appendChild(center);
-    const focusKey=state.lastRoll?.id||`ready:${state.currentPlayerId}`;
+    const focusKey=state.currentPlayerId;
     if(mapFocusKey!==focusKey){
       mapFocusKey=focusKey;
-      const target=activeRollAnimation?.from ?? (state.players.find(p=>p.id===state.currentPlayerId)?.position ?? 0);
-      setTimeout(()=>focusMapTile(target),20);
+      const from=activeRollAnimation?.from??current?.position??0;
+      const expectedPlayerId=focusKey;
+      // 所有裝置都收到同一個 currentPlayerId；只有換人時強制聚焦，後續可自行移動畫面。
+      requestAnimationFrame(()=>{
+        if(state?.status==='playing'&&state.currentPlayerId===expectedPlayerId){
+          if(mapZoom<1)setMapZoom(1,{keepCenter:false});
+          focusMapTile(from,reducedMotion?'auto':'smooth');
+        }
+      });
     }
   }
-  function focusMapTile(id){
-    const board=$('board'),wrapper=board.parentElement;
+  function focusMapTile(id,behavior='auto'){
+    const board=$('board'),wrapper=$('board-wrapper');
     const tile=board.querySelector(`[data-tile-id="${id}"]`);
     if(!tile||!wrapper)return;
-    // CSS zoom 是視覺縮放，換算後才是捲動容器的座標。
-    const scale=board.getBoundingClientRect().width/board.clientWidth;
-    const x=Number.parseFloat(tile.style.left)/100*board.clientWidth*scale;
-    const y=Number.parseFloat(tile.style.top)/100*board.clientHeight*scale;
-    if(wrapper.scrollWidth>wrapper.clientWidth+5)wrapper.scrollLeft=Math.max(0,x-wrapper.clientWidth/2);
-    if(wrapper.scrollHeight>wrapper.clientHeight+5)wrapper.scrollTop=Math.max(0,y-wrapper.clientHeight/2);
+    const scale=board.getBoundingClientRect().width/layout.WIDTH;
+    const x=Number.parseFloat(tile.style.left)*scale;
+    const y=Number.parseFloat(tile.style.top)*scale;
+    wrapper.scrollTo({
+      left:Math.max(0,x-wrapper.clientWidth/2),
+      top:Math.max(0,y-wrapper.clientHeight/2),
+      behavior:reducedMotion?'auto':behavior
+    });
   }
   // 伺服器先決定唯一的點數與終點；前端只重播同一個結果，不自行擲骰。
   async function playRollAnimation(roll,nonce){
@@ -328,6 +364,7 @@
     const mover=document.createElement('div');
     mover.className='moving-pawn';
     mover.innerHTML=animalHtml(player?.animal||'🐾');
+    mover.style.cssText=colorStyle(player);
     mover.setAttribute('aria-label',`${playerName} 正在前進`);
     board.appendChild(mover);
     const locate=id=>{
@@ -337,8 +374,8 @@
       tile.classList.add('tile-move-target');
       focusMapTile(id);
       // 以棋盤座標而不是視窗座標定位，縮放螢幕仍能逐格移動。
-      mover.style.left=`${Number.parseFloat(tile.style.left)/100*board.clientWidth}px`;
-      mover.style.top=`${Number.parseFloat(tile.style.top)/100*board.clientHeight}px`;
+      mover.style.left=tile.style.left;
+      mover.style.top=tile.style.top;
     };
     mover.classList.add('position-instant');
     locate(roll.from);
@@ -379,9 +416,9 @@
     $('turn-status').textContent=isMyTurn()?'換你啦！':'等待中';
     const current=activePlayer();
     $('current-player').innerHTML=current
-      ?`<div class="active-animal">${animalHtml(current.animal)}</div><div><div class="active-name">${esc(current.name)}${isMyTurn()?' ✨':''}</div><div class="active-sub">💰 ${money(current.cash)} · 🏠 ${current.properties.length} 處房產</div></div>`:'';
+      ?`<div class="current-identity" style="${colorStyle(current)}"><div class="active-animal">${animalHtml(current.animal)}</div><div><div class="active-name">${esc(current.name)}${isMyTurn()?' ✨':''}</div><div class="active-sub"><span class="person-color-dot"></span>${colorFor(current).name}棋子 · 現金 ${money(current.cash)} · ${current.properties.length} 處房產</div></div></div>`:'';
     if(!activeRollAnimation?.started)renderBoard();
-    renderTurnActions();renderQuestion();renderDuel();renderResult();renderScoreboard();renderLog();
+    renderTurnActions();renderQuestion();renderDuel();renderResult();renderMyAssets();renderScoreboard();renderLog();
     $('teacher-panel').hidden=!isHost();
   }
   function renderTurnActions(){
@@ -483,19 +520,37 @@
     el.hidden=false;el.classList.toggle('is-wrong',!r.correct);
     el.innerHTML=`<div class="result-head">${r.correct?'✅ 計算正確！':'📘 解題解析'}</div><div class="result-answer">正確答案：<strong>${esc(r.correctAnswer)}</strong><br/>${esc(r.explanation)}</div>`;
   }
+  function landValue(p){return p.properties.reduce((sum,id)=>sum+(state.board[id]?.price||0),0);}
+  function wealth(p){return p.cash+landValue(p);}
+  function renderMyAssets(){
+    const el=$('my-assets-panel'),p=myPlayer();
+    if(!p){el.hidden=true;return;}
+    el.hidden=false;
+    const paint=colorFor(p),assetValue=landValue(p);
+    const properties=p.properties.map(id=>state.board[id]).filter(Boolean).sort((a,b)=>a.id-b.id);
+    el.innerHTML=`<div class="assets-header" style="${colorStyle(p)}"><span class="assets-title">💼 我的資產</span><span class="my-identity">${animalHtml(p.animal)} ${esc(p.name)} · ${paint.name}</span></div>
+      <div class="asset-totals" style="${colorStyle(p)}"><div class="asset-metric"><span>💵 現金餘額</span><strong>${money(p.cash)}</strong></div><div class="asset-metric"><span>🏠 房產總值</span><strong>${money(assetValue)}</strong></div><div class="asset-metric asset-sum"><span>💰 總資產</span><strong>${money(wealth(p))}</strong></div></div>
+      <div class="assets-land-heading">🏡 我的房產（${properties.length} 處）<small>點選可定位到棋盤</small></div>
+      <div class="assets-property-list">${properties.length?properties.map(tile=>`<button type="button" class="asset-property" style="${colorStyle(p)}" data-asset-tile="${tile.id}" title="聚焦到 ${esc(tile.name)}"><span class="asset-property-name">${esc(tile.icon)} ${esc(tile.name)}</span><span>價值 ${money(tile.price)} · 租金 ${money(tile.rent)}</span></button>`).join(''):'<span class="assets-empty">還沒有房產。答對購地題後就能購買，土地會以你的代表色標示。</span>'}</div>`;
+    el.querySelectorAll('[data-asset-tile]').forEach(btn=>btn.addEventListener('click',()=>{
+      if(activeRollAnimation){showToast('棋子正在移動，請稍後再查看房產。');return;}
+      if(mapZoom<.8)setMapZoom(1);
+      focusMapTile(Number(btn.dataset.assetTile),'smooth');
+      boardWrapper.scrollIntoView({behavior:reducedMotion?'auto':'smooth',block:'center'});
+    }));
+  }
   function renderScoreboard(){
     const el=$('scoreboard');
     const ranking=[...state.players].sort((a,b)=>wealth(b)-wealth(a)||b.correct-a.correct);
-    el.innerHTML=ranking.map((p,i)=>`<div class="score-row${p.id===me?' me':''}"><div class="score-place">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div><div class="score-avatar">${animalHtml(p.animal)}</div><div><div class="score-name">${esc(p.name)}${p.host?' 👑':''}${!p.connected?' 🔌':''}</div><div class="score-detail">現金 ${money(p.cash)} · 房產 ${p.properties.length} · 答對 ${p.correct}/${p.attempted}</div></div><div class="score-money">${money(wealth(p))}</div></div>`).join('');
+    el.innerHTML=ranking.map((p,i)=>`<div class="score-row${p.id===me?' me':''}" style="${colorStyle(p)}"><div class="score-place">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div><div class="score-avatar">${animalHtml(p.animal)}</div><div class="score-content"><div class="score-name"><span class="person-color-dot"></span>${esc(p.name)} <small>${colorFor(p).name}</small>${p.host?' 👑':''}${!p.connected?' 🔌':''}${p.id===me?'（我）':''}</div><div class="score-detail">💵 現金 <b>${money(p.cash)}</b>　🏠 房產 <b>${money(landValue(p))}</b>（${p.properties.length} 處）</div><div class="score-detail">答對 ${p.correct}/${p.attempted} 題</div></div><div class="score-money"><small>總資產</small><strong>${money(wealth(p))}</strong></div></div>`).join('');
   }
-  function wealth(p){return p.cash+p.properties.reduce((sum,id)=>sum+(state.board[id]?.price||0),0);}
   function renderLog(){
     const current=state.log?.[0]?.id;
     const newEntry=!!seenLogId&&current!==seenLogId;
     $('history').innerHTML=state.log.map((l,i)=>`<div class="log-line${i===0?' latest':''}${i===0&&newEntry?' just-added':''}"><time>${new Date(l.at).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}</time>${esc(l.text)}</div>`).join('');
   }
   function renderEnd(){
-    $('end-rankings').innerHTML=state.rankings.map((r,i)=>`<div class="end-row"><strong>${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</strong><span class="avatar">${animalHtml(r.animal)}</span><div><strong>${esc(r.name)}</strong><div class="end-stats">現金 ${money(r.cash)} ＋ 房產 ${money(r.landValue)} · 答對 ${r.correct}/${r.attempted}</div></div><div class="end-amount">${money(r.score)}</div></div>`).join('');
+    $('end-rankings').innerHTML=state.rankings.map((r,i)=>`<div class="end-row" style="${colorStyle(r)}"><strong>${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</strong><span class="avatar">${animalHtml(r.animal)}</span><div><strong><span class="person-color-dot"></span>${esc(r.name)}（${colorFor(r).name}）</strong><div class="end-stats">現金 ${money(r.cash)} ＋ 房產 ${money(r.landValue)} · 答對 ${r.correct}/${r.attempted}</div></div><div class="end-amount">${money(r.score)}</div></div>`).join('');
     $('restart-btn').hidden=!isHost();
   }
 })();

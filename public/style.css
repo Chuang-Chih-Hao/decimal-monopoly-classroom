@@ -114,3 +114,148 @@
 .board .tile .tile-price{font-size:9px}
 .board-wrapper{overflow-x:auto;overflow-y:auto}
 @media(max-width:650px){.board-wrapper{max-height:510px;touch-action:pan-x pan-y}}
+
+/* v1.3 經典方格大富翁棋盤、全員換人聚焦、自由縮放與動物代表色 */
+.board-wrapper{
+  width:100%;max-height:610px;overflow:auto;overscroll-behavior:contain;
+  cursor:grab;touch-action:pan-x pan-y;padding:10px;
+  scrollbar-color:#a6bfae #f1f7ec;scrollbar-width:thin;
+}
+.board-wrapper.is-dragging{cursor:grabbing;user-select:none}
+.board{
+  display:block;position:relative;width:1180px;min-width:1180px;height:826px;
+  padding:0;border:0;border-radius:0;aspect-ratio:auto;overflow:visible;
+  background:linear-gradient(138deg,#e7f2df,#f8f6e9 55%,#e0efe4);
+  box-shadow:inset 0 0 0 3px #bed1bd;
+}
+.board .tile{
+  position:absolute;transform:translate(-50%,-50%);display:flex;
+  flex-direction:column;justify-content:center;align-items:center;
+  box-sizing:border-box;width:118px;min-width:118px;height:118px;
+  gap:4px;padding:16px 6px 24px;background:#fffefb;
+  border:2px solid #c5d6ce;border-radius:3px;
+  overflow:visible;z-index:3;
+  box-shadow:none;transition:background .2s,border-color .2s;
+}
+.board .tile:nth-child(even){background:#fffdf5}
+.board .tile.property{box-shadow:inset 0 9px 0 #79bcac}
+.board .tile.property.group-橘黃{box-shadow:inset 0 9px 0 #f0b267}
+.board .tile.property.group-紫粉{box-shadow:inset 0 9px 0 #ae9cdb}
+.board .tile.property.group-粉紅{box-shadow:inset 0 9px 0 #ed9bb6}
+.board .tile.property.group-藍色{box-shadow:inset 0 9px 0 #7aabe4}
+.board .tile.property.group-金色{box-shadow:inset 0 9px 0 #e3c165}
+.board .tile.owned,
+.board .tile.property.owned{border:3px solid var(--player-color);box-shadow:inset 0 11px 0 var(--player-color);background:var(--player-light)}
+.board .tile.board-corner{background:#fff0c3}
+.board .tile.start{background:#ffe1a0}
+.board .tile.chance,.board .tile.fate,.board .tile.chest{background:#fff1dd}
+.board .tile.boss{background:#ffe3df}
+.board .tile.scam{background:#ffebe8}
+.board .tile.compare,.board .tile.discount,.board .tile.calc{background:#e5f6ef}
+.board .tile.rest{background:#e8edff}
+.board .tile.tax{background:#f5e8e8}
+.board .tile.board-corner.owned{background:var(--player-light)}
+.board .tile:hover{z-index:7;filter:brightness(1.03)}
+.board .tile .tile-number{top:4px;left:5px;border:0;border-radius:4px;padding:3px 4px;font-size:10px;background:#2f465b;color:white}
+.board .tile .tile-icon{font-size:30px;line-height:1.1}
+.board .tile .tile-name{font-size:12px;line-height:1.25;letter-spacing:0;white-space:normal;word-break:keep-all;overflow-wrap:anywhere;font-weight:1000;max-width:102px}
+.board .tile .tile-price{font-size:11px;color:#53687b;font-weight:900}
+.board .tile .tile-pawns{
+  position:absolute;bottom:2px;left:0;right:0;display:flex;flex-wrap:nowrap;
+  justify-content:center;gap:1px;min-height:0;max-height:38px;max-width:none;
+  padding:0 2px;background:none;border:0;border-radius:0;
+}
+.board .tile .pawn{
+  font-size:20px;width:28px;height:28px;flex:none;display:inline-flex;align-items:center;justify-content:center;
+  border:2px solid var(--player-color);background:var(--player-light);
+  border-radius:50%;margin:0 -2px;filter:none;box-shadow:0 1px 3px #16293d55;
+}
+.board .tile .pawn.pawn-current{transform:translateY(-5px);box-shadow:0 0 0 3px #ffffff,0 0 0 5px var(--player-color);z-index:2}
+.board .tile .owner-mini{
+  position:absolute;top:-5px;right:2px;display:flex;align-items:center;gap:2px;
+  max-width:91px;padding:2px 5px;border:1px solid var(--player-color);
+  border-radius:8px;background:var(--player-light);box-shadow:0 2px 2px #26384525;
+  font-size:14px;line-height:1.15;color:#243447;
+}
+.board .tile .owner-mini span{font-size:9px;font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.board .tile.current-turn-tile{outline:4px solid #f5a849;outline-offset:-6px;z-index:5}
+.board .tile.tile-move-target{outline:5px solid #ffa529;outline-offset:-5px;z-index:8;background:#fff6c7}
+.board .tile.active-tile{outline-offset:-5px}
+.board .board-center{
+  position:absolute;left:118px;top:118px;width:944px;height:590px;z-index:1;
+  border:0;border-radius:0;box-shadow:none;padding:40px;
+  background:radial-gradient(circle at center,#fffdf4 0%,#f1f9eb 72%,#e6f0dc 100%);
+  overflow:hidden;
+}
+.board .board-center:before{left:8%;top:10%;font-size:55px}
+.board .board-center:after{right:8%;bottom:10%;font-size:55px}
+.board .board-center .center-title{font-size:49px;line-height:1.23}
+.board .board-center .center-logo{font-size:65px}
+.board .board-center .center-desc{font-size:16px;margin-top:10px}
+.board .board-center .dice-face{font-size:78px;margin-top:12px}
+.center-turn{
+  display:inline-flex;gap:6px;align-items:center;justify-content:center;
+  background:var(--player-light);border:2px solid var(--player-color);
+  border-radius:99px;padding:9px 20px;margin-top:18px;color:#2b3d4e;
+  font-size:14px;font-weight:1000;box-shadow:0 3px 0 #22334414;
+}
+.board .moving-pawn{min-width:55px;min-height:55px;background:var(--player-light);border:4px solid var(--player-color);font-size:37px;box-shadow:0 6px 10px #253a4855}
+.track-zoom{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap}
+.track-zoom .btn{white-space:nowrap}
+.map-zoom-label{display:inline-flex;align-items:center;justify-content:center;min-width:52px;font-size:13px;font-weight:900;font-variant-numeric:tabular-nums;color:#475e71}
+.track-instruction{line-height:1.5}
+.person-color-dot{display:inline-block;vertical-align:middle;width:11px;height:11px;border-radius:50%;margin-right:5px;background:var(--player-color);box-shadow:0 0 0 2px var(--player-light);flex:none}
+.animal-option{position:relative;display:flex;align-items:center;justify-content:center;background:var(--player-light);border-bottom:4px solid var(--player-color)}
+.animal-option.selected{border:2px solid var(--player-color);border-bottom-width:5px;background:var(--player-light);box-shadow:0 0 0 2px var(--player-light)}
+.animal-option-icon{display:flex;align-items:center;justify-content:center}
+.animal-color-dot{position:absolute;right:3px;bottom:3px;width:10px;height:10px;border-radius:50%;background:var(--player-color);border:1px solid #fff}
+.identity-chip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--player-color);border-radius:99px;padding:4px 8px;background:var(--player-light);color:#253b4e;font-weight:900}
+.identity-chip small{color:#5c6e80;font-size:10px}
+.lobby-slot:not(.empty){border-left:6px solid var(--player-color);background:linear-gradient(90deg,var(--player-light),#ffffff 55%)}
+.current-player{margin:15px 0}
+.current-identity{display:flex;align-items:center;gap:14px;width:100%;padding:12px;border-radius:14px;border-left:6px solid var(--player-color);background:var(--player-light)}
+.current-identity .active-animal{background:white;box-shadow:0 0 0 2px var(--player-color);flex:none}
+.current-identity .active-sub{line-height:1.6;font-weight:700}
+.my-assets-panel{border:2px solid #d9e4e1;background:#fffefb}
+.assets-header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:13px;flex-wrap:wrap}
+.assets-title{font-size:18px;font-weight:1000}
+.my-identity{display:inline-flex;align-items:center;gap:6px;border-radius:99px;background:var(--player-light);border:1px solid var(--player-color);padding:6px 10px;font-size:12px;font-weight:900}
+.asset-totals{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.asset-metric{padding:11px 12px;border:1px solid #e5e8e4;border-radius:12px;background:#fff}
+.asset-metric span{display:block;font-size:12px;color:#6a7885;font-weight:800;margin-bottom:4px}
+.asset-metric strong{display:block;font-size:20px;font-variant-numeric:tabular-nums;color:#263b50}
+.asset-metric.asset-sum{grid-column:1/-1;background:var(--player-light);border:2px solid var(--player-color);display:flex;align-items:center;justify-content:space-between;gap:10px}
+.asset-metric.asset-sum span{margin:0;color:#253d50;font-size:15px}
+.asset-metric.asset-sum strong{font-size:27px}
+.assets-land-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:16px 0 9px;font-weight:1000;font-size:14px}
+.assets-land-heading small{font-size:10px;font-weight:600;color:#7c8b94}
+.assets-property-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.asset-property{display:flex;flex-direction:column;gap:4px;text-align:left;min-width:0;border:1px solid var(--player-color);border-left:6px solid var(--player-color);background:var(--player-light);padding:8px;border-radius:9px;color:#2a3c50;cursor:pointer}
+.asset-property:hover{filter:brightness(.96)}
+.asset-property-name{font-weight:900;font-size:12px}
+.asset-property>span:last-child{font-size:11px;line-height:1.45}
+.assets-empty{font-size:12px;line-height:1.8;color:#6c7e8d;grid-column:1/-1;padding:9px;background:#f2f7f3;border-radius:9px}
+.score-row{border-left:5px solid var(--player-color);border-bottom:1px solid #e8e9e6;padding:11px 6px 11px 10px;margin:6px 0;border-radius:9px;background:#fff}
+.score-row.me{background:var(--player-light)}
+.score-row.me .score-name:after{content:none}
+.score-content{min-width:0}
+.score-name{font-size:13px;line-height:1.4}
+.score-name small{font-weight:700;color:#64778a;font-size:10px}
+.score-detail{font-size:11px;line-height:1.65;color:#5e7484}
+.score-detail b{color:#293c4b}
+.score-money{text-align:right;font-variant-numeric:tabular-nums}
+.score-money small{display:block;font-size:10px;font-weight:800;color:#718493}
+.score-money strong{font-size:17px;color:#24384b}
+.end-row{border-left:7px solid var(--player-color)}
+@media(max-width:650px){
+  .board-wrapper{max-height:480px;padding:6px;touch-action:pan-x pan-y}
+  .track-tools{align-items:flex-start}
+  .track-zoom{justify-content:flex-start;width:100%}
+  .track-zoom .btn{font-size:11px;padding:7px 10px}
+  .assets-property-list{grid-template-columns:1fr}
+  .asset-metric strong{font-size:18px}
+  .asset-metric.asset-sum strong{font-size:25px}
+  .score-row{grid-template-columns:24px 38px minmax(0,1fr) auto;gap:5px}
+  .score-money strong{font-size:15px}
+  .score-detail{font-size:10px}
+}

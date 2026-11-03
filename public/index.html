@@ -8,6 +8,8 @@
   <title>小數富翁探險島｜六年級數學連線大富翁</title>
   <link rel="stylesheet" href="/style.css" />
   <script src="/socket.io/socket.io.js" defer></script>
+  <script src="/board-layout.js" defer></script>
+  <script src="/player-colors.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -21,7 +23,7 @@
     <div class="intro-copy">
       <div class="eyebrow">✦ 小數應用主題教室 ✦</div>
       <h1>把小數變成你的<br/><em>致富超能力！</em></h1>
-      <p>擲骰前進、算折扣、拆穿黑心商人，搶購店面挑戰最終 Boss。<br/>30 格彎曲賽道、雙人快速對決，每一格都藏著新的數學冒險！</p>
+      <p>擲骰前進、算折扣、拆穿黑心商人，搶購店面挑戰最終 Boss。<br/>30 格經典方格棋盤、雙人快速對決，每一格都藏著新的數學冒險！</p>
       <div class="feature-tags"><span>🧮 小數四則</span><span>🏷️ 折扣比價</span><span>🏠 買地收租</span><span>⚔️ 猜拳／烏龜烏龜翹</span><span>🐉 兩題 Boss</span></div>
       <div class="entry-decoration">🐈 <span>🦫</span> 🐼</div>
     </div>
@@ -30,7 +32,7 @@
       <h2>選好你的冒險角色</h2>
       <label class="field-label" for="player-name">冒險家暱稱</label>
       <input id="player-name" class="text-input" maxlength="14" placeholder="例如：小數高手" autocomplete="nickname" />
-      <div class="field-label">選擇動物棋子 <small>每個房間不重複</small></div>
+      <div class="field-label">選擇動物棋子 <small>每隻動物都有自己的代表色，房間內不重複</small></div>
       <div id="animal-picker" class="animal-picker" role="group" aria-label="選擇動物棋子"></div>
       <button id="create-btn" class="btn primary full">👑 我是房主，建立新房間</button>
       <div class="or"><span>或使用房間代碼加入</span></div>
@@ -61,15 +63,15 @@
       <div class="play-grid">
         <section class="board-column">
           <div class="section-head"><div><span class="overline">DECIMAL ISLAND</span><h2>小數富翁地圖</h2></div><div class="game-clock-group"><div id="round-chip" class="round-chip">第 1 / 12 輪</div><div id="session-clock" class="session-clock">⏱️ 30:00</div></div></div>
-          <div class="track-tools"><span class="track-instruction">🛣️ 30 格彎曲車道 · 可左右滑動；棋子會逐格移動</span><div class="track-zoom"><button type="button" class="btn outline small" id="map-overview">🔎 全覽</button><button type="button" class="btn outline small" id="map-fullsize">🔍 放大地圖</button></div></div><div class="board-wrapper"><div id="board" class="board" aria-label="大富翁遊戲棋盤"><div id="board-center" class="board-center"></div></div></div>
+          <div class="track-tools"><span class="track-instruction">🎲 30 格經典大富翁棋盤 · 換人自動聚焦；可自由縮放、拖曳與滑動</span><div class="track-zoom" aria-label="棋盤視野控制"><button type="button" class="btn outline small" id="map-overview">全覽</button><button type="button" class="btn outline small" id="map-zoom-out" aria-label="縮小棋盤">−</button><span id="map-zoom-label" class="map-zoom-label" aria-live="polite">100%</span><button type="button" class="btn outline small" id="map-zoom-in" aria-label="放大棋盤">＋</button><button type="button" class="btn outline small" id="map-fullsize">🎯 聚焦目前玩家</button></div></div><div id="board-wrapper" class="board-wrapper" aria-label="棋盤可用滑動或拖曳調整位置"><div id="board" class="board" aria-label="大富翁遊戲棋盤"><div id="board-center" class="board-center"></div></div></div>
           <div class="board-legend"><span><b class="legend-square prop"></b>可購買店面</span><span><b class="legend-square event"></b>答題事件</span><span>🏁 經過起點 +$200</span><span>⚔️ 別人的房產：繳租後雙人加賽</span></div>
           <section class="panel history-panel"><h3>📣 冒險紀錄 <small>最新事件置頂</small></h3><div id="history" class="history" aria-live="polite"></div></section>
         </section>
         <aside class="side-column">
-          <section class="panel current-panel"><div class="side-eyebrow">NOW PLAYING <span id="turn-status" class="mini-badge">進行中</span></div><div id="current-player" class="current-player"></div><div id="turn-actions" class="turn-actions"></div></section>
+          <section id="my-assets-panel" class="panel my-assets-panel" aria-label="我的現金與房產明細"></section><section class="panel current-panel"><div class="side-eyebrow">NOW PLAYING <span id="turn-status" class="mini-badge">進行中</span></div><div id="current-player" class="current-player"></div><div id="turn-actions" class="turn-actions"></div></section>
           <section id="duel-panel" class="panel duel-panel" hidden></section><section id="question-panel" class="panel question-panel" hidden></section>
           <section id="result-panel" class="panel result-panel" hidden></section>
-          <section class="panel ranking-panel"><div class="ranking-header"><h3>🏆 財富排行榜</h3><small>總資產＝現金＋房產價值</small></div><div id="scoreboard"></div></section>
+          <section class="panel ranking-panel"><div class="ranking-header"><h3>🏆 財富排行榜</h3><small>每位玩家的現金、房產市值及總資產</small></div><div id="scoreboard"></div></section>
           <section id="teacher-panel" class="panel teacher-panel" hidden><div class="side-eyebrow">👑 房主控制台</div><p>學生無法操作時，可略過題目或雙人小遊戲；30 分鐘倒數結束後自動結算，亦可提前結束。</p><div class="teacher-actions"><button id="skip-btn" class="btn outline small">⏭️ 略過目前回合</button><button id="finish-btn" class="btn warning small">結束並結算</button></div></section>
         </aside>
       </div>
