@@ -1,7 +1,7 @@
 /* 小數富翁前端：所有資產、擲骰、判分都以伺服器狀態為準。 */
 (() => {
   'use strict';
-  const CLIENT_VERSION='1.6.3';
+  const CLIENT_VERSION='1.6.5';
   const socket=io({transports:['websocket','polling'],reconnection:true});
   const $=id=>document.getElementById(id);
   const esc=(value)=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -30,6 +30,7 @@
   let deferredFeedback=null;
   let seenDuelResultId=null;
   let reflectionDirty=false;
+  const tileEffectTimers=new Map();
   const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
   const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   // 新版部署後，舊分頁不會自動取得新的 HTML：登入或重新開啟分頁時檢查版本。
@@ -130,6 +131,101 @@
     else showSpotlight(item.icon,item.title,item.detail,item.kind);
   }
 
+
+  function clearTileEffect(tileId){
+    const active=tileEffectTimers.get(tileId);
+    if(active){
+      clearTimeout(active.timer);
+      active.el?.remove();
+      active.tile?.classList.remove('tile-effect-active','tile-effect-build');
+      tileEffectTimers.delete(tileId);
+    }
+  }
+  function tileFlavorSpec(tile){
+    const byId={
+      1:{theme:'stationery',badge:'文具補給站',className:'fx-stationery',ambient:'<span class="ambient-piece piece-pencil">✏️</span><span class="ambient-piece piece-spark">✦</span>'},
+      3:{theme:'convenience',badge:'便利商店',className:'fx-convenience',ambient:'<span class="ambient-piece piece-store">▤</span><span class="ambient-piece piece-bag">🛍️</span>'},
+      5:{theme:'dessert',badge:'甜點工坊',className:'fx-dessert',ambient:'<span class="ambient-piece piece-candy">🍓</span><span class="ambient-piece piece-spark">✦</span>'},
+      7:{theme:'hotel',badge:'動物旅館',className:'fx-hotel',ambient:'<span class="ambient-piece piece-bell">🔔</span><span class="ambient-piece piece-z">Z</span>'},
+      9:{theme:'sports',badge:'運動用品店',className:'fx-sports',ambient:'<span class="ambient-piece piece-ball">●</span><span class="ambient-piece piece-ball two">●</span>'},
+      11:{theme:'bookstore',badge:'森林書店',className:'fx-bookstore',ambient:'<span class="ambient-piece piece-page">📖</span><span class="ambient-piece piece-leaf">🍃</span>'},
+      13:{theme:'fashion',badge:'時尚服飾店',className:'fx-fashion',ambient:'<span class="ambient-piece piece-ribbon">🎀</span><span class="ambient-piece piece-spark">✦</span>'},
+      15:{theme:'toy',badge:'玩具王國',className:'fx-toy',ambient:'<span class="ambient-piece piece-block">🧩</span><span class="ambient-piece piece-star">★</span>'},
+      17:{theme:'fruit',badge:'水果市集',className:'fx-fruit',ambient:'<span class="ambient-piece piece-fruit">🍎</span><span class="ambient-piece piece-leaf">🍃</span>'},
+      19:{theme:'electro',badge:'電子商城',className:'fx-electro',ambient:'<span class="ambient-piece piece-pixel">▣</span><span class="ambient-piece piece-pixel two">▣</span>'},
+      22:{theme:'cinema',badge:'星光電影院',className:'fx-cinema',ambient:'<span class="ambient-piece piece-film">▥</span><span class="ambient-piece piece-popcorn">🍿</span>'},
+      24:{theme:'cafe',badge:'親子咖啡館',className:'fx-cafe',ambient:'<span class="ambient-piece piece-steam">〰</span><span class="ambient-piece piece-steam two">〰</span>'},
+      27:{theme:'ocean',badge:'海洋樂園',className:'fx-ocean',ambient:'<span class="ambient-piece piece-wave">≈</span><span class="ambient-piece piece-wave two">≈</span>'},
+      4:{theme:'chance',badge:'機會觸發',className:'fx-lucky',ambient:'<span class="ambient-piece piece-star">✦</span><span class="ambient-piece piece-leaf">🍀</span>'},
+      8:{theme:'fate',badge:'命運啟動',className:'fx-spin',ambient:'<span class="ambient-piece piece-orb">🔮</span><span class="ambient-piece piece-spark">✦</span>'},
+      20:{theme:'fate',badge:'命運啟動',className:'fx-spin',ambient:'<span class="ambient-piece piece-orb">🔮</span><span class="ambient-piece piece-spark">✦</span>'},
+      23:{theme:'chance',badge:'機會觸發',className:'fx-lucky',ambient:'<span class="ambient-piece piece-star">✦</span><span class="ambient-piece piece-leaf">🍀</span>'},
+      26:{theme:'chest',badge:'寶箱開啟',className:'fx-chest',ambient:'<span class="ambient-piece piece-key">🗝️</span><span class="ambient-piece piece-star">✦</span>'},
+      28:{theme:'boss',badge:'Boss 警報',className:'fx-boss',ambient:'<span class="ambient-piece piece-boss">⚡</span><span class="ambient-piece piece-star">✦</span>'},
+      29:{theme:'wheel',badge:'命運大轉盤',className:'fx-wheel',ambient:'<span class="ambient-piece piece-wheel">🎡</span><span class="ambient-piece piece-spark">✦</span>'},
+      0:{theme:'start',badge:'夢想起點',className:'fx-start',ambient:'<span class="ambient-piece piece-flag">🏁</span><span class="ambient-piece piece-spark">✦</span>'},
+      10:{theme:'rescue',badge:'黑心商人',className:'fx-alert',ambient:'<span class="ambient-piece piece-alert">❗</span><span class="ambient-piece piece-star">✦</span>'},
+      14:{theme:'chest',badge:'神祕寶箱',className:'fx-chest',ambient:'<span class="ambient-piece piece-key">🎁</span><span class="ambient-piece piece-star">✦</span>'},
+      18:{theme:'tax',badge:'稅務提醒',className:'fx-alert',ambient:'<span class="ambient-piece piece-tax">🧾</span><span class="ambient-piece piece-star">✦</span>'},
+      21:{theme:'boss',badge:'終極 Boss',className:'fx-boss',ambient:'<span class="ambient-piece piece-boss">⚡</span><span class="ambient-piece piece-star">✦</span>'},
+      25:{theme:'compare',badge:'精打細算站',className:'fx-compare',ambient:'<span class="ambient-piece piece-bag">🛒</span><span class="ambient-piece piece-spark">✦</span>'}
+    };
+    const typeDefaults={
+      property:{theme:'property',badge:'店面抵達',className:'fx-shop',ambient:'<span class="ambient-piece piece-star">✦</span>'},
+      chance:{theme:'chance',badge:'機會觸發',className:'fx-lucky',ambient:'<span class="ambient-piece piece-leaf">🍀</span>'},
+      fate:{theme:'fate',badge:'命運啟動',className:'fx-spin',ambient:'<span class="ambient-piece piece-orb">🔮</span>'},
+      chest:{theme:'chest',badge:'寶箱開啟',className:'fx-chest',ambient:'<span class="ambient-piece piece-key">🗝️</span>'},
+      boss:{theme:'boss',badge:'Boss 警報',className:'fx-boss',ambient:'<span class="ambient-piece piece-boss">⚡</span>'},
+      discount:{theme:'discount',badge:'折扣挑戰',className:'fx-tag',ambient:'<span class="ambient-piece piece-star">🏷️</span>'},
+      compare:{theme:'compare',badge:'比價開始',className:'fx-compare',ambient:'<span class="ambient-piece piece-star">⚖️</span>'},
+      calc:{theme:'calc',badge:'小數神算',className:'fx-calc',ambient:'<span class="ambient-piece piece-star">🧮</span>'},
+      scam:{theme:'scam',badge:'黑心商人',className:'fx-alert',ambient:'<span class="ambient-piece piece-alert">❗</span>'},
+      start:{theme:'start',badge:'抵達起點',className:'fx-start',ambient:'<span class="ambient-piece piece-flag">🏁</span>'},
+      rest:{theme:'rest',badge:'補給休息',className:'fx-rest',ambient:'<span class="ambient-piece piece-bag">🛍️</span>'},
+      tax:{theme:'tax',badge:'稅務提醒',className:'fx-alert',ambient:'<span class="ambient-piece piece-tax">🧾</span>'}
+    };
+    const picked=byId[tile.id]||typeDefaults[tile.type]||{theme:'event',badge:tile.name||'事件觸發',className:'fx-pop',ambient:'<span class="ambient-piece piece-star">✦</span>'};
+    return {...picked,icon:tile.icon||'✨'};
+  }
+  function landingEffectSpec(tile){
+    const flavor=tileFlavorSpec(tile);
+    return {badge:flavor.badge||tile.name||'事件觸發',icon:flavor.icon||tile.icon||'✨',className:flavor.className||'fx-pop',theme:flavor.theme||'event'};
+  }
+  function playTileEffect(tileId,mode,spec={}){
+    const tile=$('board')?.querySelector(`[data-tile-id="${tileId}"]`);
+    if(!tile)return;
+    clearTileEffect(tileId);
+    const overlay=document.createElement('div');
+    overlay.className=`tile-effect-overlay ${spec.className||'fx-pop'} mode-${mode}`;
+    overlay.setAttribute('aria-hidden','true');
+    if(mode==='build'){
+      overlay.innerHTML=`<span class="tile-effect-badge">🏗️ 購地成功</span><div class="tile-effect-build tile-effect-build-${esc(spec.theme||'property')}"><span class="tile-effect-build-icon tile-effect-build-store">${esc(spec.storeIcon||'🏠')}</span><span class="tile-effect-build-icon tile-effect-build-house">🏠</span><span class="tile-effect-build-icon tile-effect-build-hammer">🔨</span><span class="tile-effect-build-flash">✨ ✦</span></div>`;
+      tile.classList.add('tile-effect-build');
+    }else{
+      overlay.innerHTML=`<span class="tile-effect-badge">${esc(spec.badge||'事件觸發')}</span><span class="tile-effect-icon">${esc(spec.icon||'✨')}</span><span class="tile-effect-ring"></span><span class="tile-effect-stars">✦ ✧ ✦</span>`;
+    }
+    tile.classList.add('tile-effect-active');
+    tile.appendChild(overlay);
+    const duration=mode==='build' ? (reducedMotion?380:1700) : (reducedMotion?280:1350);
+    const timer=setTimeout(()=>{
+      overlay.remove();
+      tile.classList.remove('tile-effect-active','tile-effect-build');
+      tileEffectTimers.delete(tileId);
+    },duration);
+    tileEffectTimers.set(tileId,{timer,el:overlay,tile});
+  }
+  function playLandingTileEffect(tileId){
+    const tile=state?.board?.[tileId];
+    if(!tile)return;
+    playTileEffect(tileId,'landing',landingEffectSpec(tile));
+  }
+  function playPropertyBuildEffect(tileId,ownerId){
+    const tile=state?.board?.[tileId];
+    if(!tile)return;
+    const owner=state?.players?.find(player=>player.id===ownerId);
+    const flavor=tileFlavorSpec(tile);
+    playTileEffect(tileId,'build',{storeIcon:tile.icon||'🏠',ownerName:owner?.name||'',className:flavor.className||'fx-shop',theme:flavor.theme||'property'});
+  }
   function request(event,payload={},done){
     if(!socket.connected){showToast('尚未連線，請檢查網路。',true);return;}
     socket.timeout(10000).emit(event,payload,(err,response)=>{
@@ -272,6 +368,9 @@
   socket.on('state',next=>{
     if(!me)return;
     const previous=state;
+    const newPropertyBuilds=previous?.status==='playing'&&next.status==='playing'
+      ? Object.entries(next.properties||{}).filter(([tileId,ownerId])=>ownerId&&previous?.properties?.[tileId]!==ownerId).map(([tileId,ownerId])=>({tileId:Number(tileId),ownerId}))
+      : [];
     if(previous?.status==='finished'&&next.status==='lobby'){reflectionDirty=false;$('reflection-input').value='';}
     // 若房主在上一位角色移動動畫未播完就跳回合，立即停止舊動畫，避免鏡頭與新回合爭奪焦點。
     if(previous?.currentPlayerId!==next.currentPlayerId&&activeRollAnimation){
@@ -291,7 +390,14 @@
     state=next;
     render();
     if(isNewRoll)void playRollAnimation(next.lastRoll,animationNonce);
-    else highlightNewEvents(previous,next);
+    else {
+      highlightNewEvents(previous,next);
+      if(newPropertyBuilds.length){
+        newPropertyBuilds.forEach((item,index)=>setTimeout(()=>{
+          if(!activeRollAnimation&&state?.status==='playing')playPropertyBuildEffect(item.tileId,item.ownerId);
+        },120+index*220));
+      }
+    }
     seenLogId=next.log?.[0]?.id??null;
   });
   socket.on('roomClosed',()=>{clearSession();showToast('房主已解散房間。',true);});
@@ -344,20 +450,24 @@
   }
   // 30 格固定為 10 × 7 的傳統大富翁方格外圈；不變更伺服器的格子編號。
   function renderBoard(){
-    const board=$('board');board.replaceChildren();board.style.zoom=String(mapZoom);
+    const board=$('board');
+    for(const tileId of tileEffectTimers.keys())clearTileEffect(tileId);
+    board.replaceChildren();board.style.zoom=String(mapZoom);
     if(state.board.length!==layout.COUNT)throw new Error('棋盤格數與版型不一致');
     state.board.forEach(tile=>{
       const {col,row}=layout.positionFor(tile.id),el=document.createElement('div');
       const owner=state.players.find(p=>p.id===state.properties[tile.id]);
       const pawns=state.players.filter(p=>p.position===tile.id&&p.id!==activeRollAnimation?.playerId);
       const currentPos=activeRollAnimation ? activeRollAnimation.from : activePlayer()?.position;
-      el.className=`tile ${tile.type}${tile.group?' group-'+tile.group:''}${pawns.length?' active-tile':''}${owner?' owned':''}${currentPos===tile.id?' current-turn-tile':''}${[0,9,15,24].includes(tile.id)?' board-corner':''}`;
+      const flavor=tileFlavorSpec(tile);
+      el.className=`tile ${tile.type}${tile.group?' group-'+tile.group:''} tile-theme-${flavor.theme||'event'}${pawns.length?' active-tile':''}${owner?' owned':''}${currentPos===tile.id?' current-turn-tile':''}${[0,9,15,24].includes(tile.id)?' board-corner':''}`;
       el.dataset.tileId=String(tile.id);
+      el.dataset.tileTheme=flavor.theme||'event';
       el.style.left=`${(col+.5)*layout.CELL}px`;
       el.style.top=`${(row+.5)*layout.CELL}px`;
       if(owner)el.style.cssText+=`;${colorStyle(owner)}`;
       el.title=tile.type==='property'?`${tile.name}：購地 ${money(tile.price)}，租金 ${money(tile.rent)}${owner?'，屋主 '+owner.name+'（'+colorFor(owner).name+'）':''}`:`${tile.name}：${tile.tip||''}`;
-      el.innerHTML=`<span class="tile-number">${String(tile.id).padStart(2,'0')}</span><span class="tile-icon">${esc(tile.icon)}</span><span class="tile-name">${esc(tile.name)}</span>`
+      el.innerHTML=`<div class="tile-ambient ambient-${flavor.theme||'event'}" aria-hidden="true">${flavor.ambient||''}</div><span class="tile-number">${String(tile.id).padStart(2,'0')}</span><span class="tile-icon">${esc(tile.icon)}</span><span class="tile-name">${esc(tile.name)}</span>`
         +(tile.price?`<span class="tile-price">${money(tile.price)}</span>`:'')
         +(owner?`<span class="owner-mini" title="${esc(owner.name)} 的房產">${animalHtml(owner.animal)}<span>${esc(owner.name)}</span></span>`:'')
         +`<div class="tile-pawns">${pawns.map(p=>`<span class="pawn${p.id===state.currentPlayerId?' pawn-current':''}" style="${colorStyle(p)}" title="${esc(p.name)}・${colorFor(p).name}">${animalHtml(p.animal)}</span>`).join('')}</div>`;
@@ -474,6 +584,7 @@
     activeRollAnimation=null;
     renderBoard();renderTurnActions();renderQuestion();renderDuel();
     focusMapTile(roll.position);
+    playLandingTileEffect(roll.position);
     if(isMyTurn() || state.duel?.ownerId===me){
       const panel=state.duel?$('duel-panel'):state.pending?$('question-panel'):null;
       if(panel&&!panel.hidden)setTimeout(()=>{if(animationNonce===nonce)panel.scrollIntoView({behavior:reducedMotion?'instant':'smooth',block:'center'});},450);

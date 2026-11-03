@@ -148,3 +148,45 @@ test('水豚使用側身 SVG，12 種動物在選角格都有可見中文名稱'
   assert.match(css,/\.animal-picker \.animal-option\s*\{/);
   assert.equal(ANIMALS[0],'capybara');
 });
+
+
+// v1.6.4：落點格子動畫與購地蓋房動畫。
+test('前端包含到格事件特效與購地蓋房動畫',()=>{
+  const style=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
+  assert.ok(app.includes('function playTileEffect('));
+  assert.ok(app.includes('function playLandingTileEffect('));
+  assert.ok(app.includes('function playPropertyBuildEffect('));
+  assert.ok(app.includes('playLandingTileEffect(roll.position)'));
+  assert.ok(app.includes('newPropertyBuilds'));
+  assert.match(style,/\.tile-effect-overlay/);
+  assert.match(style,/@keyframes tile-fx-spin/);
+  assert.match(style,/@keyframes tile-build-rise/);
+  assert.match(style,/\.tile\.tile-effect-build/);
+});
+
+
+// v1.6.5：每種店面都有專屬常駐風格與到格特效。
+test('前端為地圖格子加入主題風格與專屬到格動畫',()=>{
+  const style=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
+  assert.ok(app.includes('function tileFlavorSpec('));
+  assert.ok(app.includes("theme:'cinema'"));
+  assert.ok(app.includes("theme:'cafe'"));
+  assert.ok(app.includes('fx-ocean'));
+  assert.ok(app.includes('fx-cinema'));
+  assert.match(style,/\.tile-theme-cinema \.piece-film/);
+  assert.match(style,/\.tile-theme-cafe \.piece-steam/);
+  assert.match(style,/\.tile-theme-ocean \.piece-wave/);
+  assert.match(style,/@keyframes ambient-film/);
+  assert.match(style,/@keyframes ambient-steam/);
+  assert.match(style,/@keyframes ambient-wave/);
+});
+
+// 上線前核對：保留原有的格子事件類型與號碼徽章絕對定位。
+test('專屬動畫不應把第 25 格比價站當成休息站，也不覆蓋格子定位',()=>{
+  const style=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
+  assert.match(app,/25:\{theme:'compare',badge:'精打細算站'/);
+  assert.doesNotMatch(app,/25:\{theme:'rest'/);
+  assert.match(style,/\.board \.tile>\.tile-icon,\.board \.tile>\.tile-name,\.board \.tile>\.tile-price/);
+  assert.doesNotMatch(style,/\.board \.tile>\*:not\(\.tile-ambient\)/);
+  assert.ok(app.includes('for(const tileId of tileEffectTimers.keys())clearTileEffect(tileId)'));
+});
