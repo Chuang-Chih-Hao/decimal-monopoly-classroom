@@ -199,7 +199,7 @@
     if(!window.confirm('確定離開這個房間？房主離開會關閉等待中的房間。'))return;
     request('leave',{},(ok)=>{if(ok)clearSession();});
   });
-  $('start-btn').addEventListener('click',()=>request('start',{rounds:Number($('round-select').value),money:Number($('money-select').value),questionSeconds:Number($('question-time-select').value),durationMinutes:Number($('duration-select').value)}));
+  $('start-btn').addEventListener('click',()=>request('start',{rounds:$('round-select').value==='unlimited'?'unlimited':Number($('round-select').value),money:Number($('money-select').value),questionSeconds:Number($('question-time-select').value),durationMinutes:Number($('duration-select').value)}));
   $('skip-btn').addEventListener('click',()=>{
     if(window.confirm('即將跳過目前題目或雙人加賽，並進入下一人。對戰跳過時不收額外零用錢，確定嗎？'))request('skip');
   });
@@ -411,7 +411,7 @@
     }
   }
   function renderPlaying(){
-    $('round-chip').textContent=`第 ${state.round} / ${state.roundLimit} 輪`;
+    $('round-chip').textContent=state.roundLimit===null?`第 ${state.round} 輪 · ♾️ 無限輪`:`第 ${state.round} / ${state.roundLimit} 輪`;
     updateSessionClock();
     $('turn-status').textContent=isMyTurn()?'換你啦！':'等待中';
     const current=activePlayer();
@@ -549,8 +549,32 @@
     const newEntry=!!seenLogId&&current!==seenLogId;
     $('history').innerHTML=state.log.map((l,i)=>`<div class="log-line${i===0?' latest':''}${i===0&&newEntry?' just-added':''}"><time>${new Date(l.at).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}</time>${esc(l.text)}</div>`).join('');
   }
+  function renderLearningFeedback(){
+    const el=$('learning-feedback');
+    const mine=state.personalFeedback;
+    const group=state.classFeedback;
+    if(!mine){el.innerHTML='<p>正在載入你的學習回饋…</p>';return;}
+    const percent=n=>n===null?'尚無資料':`${n}%`;
+    const allRows=[...mine.bySkill].sort((a,b)=>b.wrong-a.wrong || a.accuracy-b.accuracy);
+    const weak=mine.weakSkills;
+    const intro=mine.attempted===0?'這局沒有被計入的作答，暫時無法判斷熟練度。':
+      weak.length===0?'這局作答的題目全部正確！繼續練習其他題型，增加挑戰。':
+      `這局你答錯 ${mine.wrong} 題，建議先複習下列 ${weak.length} 種題型。題數少時，結果只是練習線索，不代表能力評定。`;
+    const weakHtml=weak.length?`<div class="feedback-weak-grid">${weak.map((item,index)=>`<div class="feedback-weak-card"><div class="feedback-weak-heading"><b>${index+1}. ${esc(item.name)}</b><span>答錯 ${item.wrong}/${item.attempted} 題</span></div><p>💡 ${esc(item.tip)}</p>${item.timedOut?`<small>其中 ${item.timedOut} 題是時間到未作答。</small>`:''}</div>`).join('')}</div>`:'';
+    const typeRows=allRows.length?allRows.map(item=>`<div class="feedback-skill-row"><span>${esc(item.name)}</span><span>${item.correct} / ${item.attempted} 題</span><strong class="${item.wrong?'need-review':'all-correct'}">${percent(item.accuracy)}</strong></div>`).join(''):'<p class="feedback-note">本局尚無可統計的題目。</p>';
+    const examples=mine.examples.map(item=>`<details class="feedback-example"><summary><span class="feedback-example-type">${esc(item.skillName)}</span>${esc(item.question)}${item.timedOut?' <small>（逾時）</small>':''}</summary><div class="feedback-example-solution"><strong>正確答案：${esc(item.answer)}</strong><p>${esc(item.explanation)}</p></div></details>`).join('');
+    const classRows=group?.bySkill?.length?group.bySkill.slice(0,5).map(item=>`<div class="feedback-skill-row"><span>${esc(item.name)}</span><span>全班答錯 ${item.wrong}/${item.attempted} 題</span><strong>${percent(item.accuracy)}</strong></div>`).join(''):'<p class="feedback-note">這局沒有全班答題資料。</p>';
+    el.innerHTML=`<div class="feedback-heading"><div><span class="overline">PERSONAL LEARNING REPORT</span><h3>🧠 我的數學學習回饋</h3></div><div class="feedback-overall" style="${colorStyle(myPlayer())}">${animalHtml(myPlayer()?.animal)} <strong>${mine.correct} / ${mine.attempted}</strong><small>答對題數 · 正確率 ${percent(mine.accuracy)}</small></div></div>
+      <p class="feedback-intro">${esc(intro)}</p>
+      ${mine.timedOut?`<p class="feedback-note">⏱️ 有 ${mine.timedOut} 題因時間到而記為未答對，請搭配作答時間看結果。</p>`:''}
+      ${weakHtml}<h4>📊 各種題型作答統計</h4><div class="feedback-skill-list">${typeRows}</div>
+      <h4>📖 我的錯題複習（最多 6 題）</h4>${examples||'<p class="feedback-note">這局沒有錯題可以回顧。</p>'}
+      <div class="feedback-privacy">🔒 這份個人錯題和解析只有你自己能看到；全班共通題型統計不會顯示個人姓名。</div>
+      <div class="feedback-class"><h4>🏫 全班共同需要練習的題型</h4><p class="feedback-note">依答錯次數排序，僅供教師規劃下次複習；不同題型的作答次數可能不同。</p>${classRows}</div>`;
+  }
   function renderEnd(){
     $('end-rankings').innerHTML=state.rankings.map((r,i)=>`<div class="end-row" style="${colorStyle(r)}"><strong>${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</strong><span class="avatar">${animalHtml(r.animal)}</span><div><strong><span class="person-color-dot"></span>${esc(r.name)}（${colorFor(r).name}）</strong><div class="end-stats">現金 ${money(r.cash)} ＋ 房產 ${money(r.landValue)} · 答對 ${r.correct}/${r.attempted}</div></div><div class="end-amount">${money(r.score)}</div></div>`).join('');
+    renderLearningFeedback();
     $('restart-btn').hidden=!isHost();
   }
 })();

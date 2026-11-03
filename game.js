@@ -2,6 +2,7 @@
 const { randomBytes, randomUUID } = require('node:crypto');
 const { BOARD, ANIMALS } = require('./board');
 const { BANK } = require('./questions');
+const {summarizePlayer,summarizeClass}=require('./feedback');
 
 const MAX_PEOPLE = 6; // 一位房主 + 最多五位學生
 const QUESTION_SECONDS = 120; // 六年級學生預設有兩分鐘計算時間
@@ -103,7 +104,7 @@ class GameManager {
   makePlayer(name, animal, host=false) {
     return { id:randomUUID(), token:randomBytes(24).toString('hex'), name, animal,
       host, connected:true, socketId:null, cash:0, properties:[], position:0,
-      missedTurns:0, correct:0, attempted:0 };
+      missedTurns:0, correct:0, attempted:0, answerHistory:[] };
   }
 
   join(code, name, animal) {
@@ -146,11 +147,12 @@ class GameManager {
     requireHost(room,hostId);
     if (room.status !== 'lobby') throw new GameError('這場遊戲已開始。');
     if (room.players.length < 2) throw new GameError('至少要有兩位玩家才能開始。');
-    const limit = Number(settings.rounds ?? 12);
+    const unlimited=settings.rounds==='unlimited';
+    const limit=unlimited?null:Number(settings.rounds ?? 12);
     const money = Number(settings.money ?? 900);
     const questionSeconds = Number(settings.questionSeconds ?? QUESTION_SECONDS);
     const durationMinutes = Number(settings.durationMinutes ?? GAME_MINUTES);
-    if (![2,3,4,5,6,8,10,12].includes(limit) || ![600,900,1200].includes(money)
+    if ((!unlimited && ![2,3,4,5,6,8,10,12].includes(limit)) || ![600,900,1200].includes(money)
       || ![90,120,150,180].includes(questionSeconds) || ![20,30,40].includes(durationMinutes)) {
       throw new GameError('請選擇合法的回合數與起始資金。');
     }
@@ -161,8 +163,8 @@ class GameManager {
     room.turnIndex=0; room.currentPlayerId=room.players[0].id;
     room.properties={}; room.pending=null; room.lastRoll=null; room.lastResult=null;
     room.questionQueues={}; room.rankings=[];
-    room.players.forEach(p=>{p.cash=money;p.properties=[];p.position=0;p.correct=0;p.attempted=0;p.missedTurns=0;});
-    message(room, `🎉 遊戲開始！每人獲得 $${money}，每題 ${questionSeconds} 秒，最多 ${limit} 輪或 ${durationMinutes} 分鐘。${room.players[0].name} 先擲骰。`);
+    room.players.forEach(p=>{p.cash=money;p.properties=[];p.position=0;p.correct=0;p.attempted=0;p.answerHistory=[];p.missedTurns=0;});
+    message(room, `🎉 遊戲開始！每人獲得 $${money}，每題 ${questionSeconds} 秒，${unlimited?'無輪數上限':'最多 '+limit+' 輪'}，${durationMinutes} 分鐘後結算（房主也可提前結束）。${room.players[0].name} 先擲骰。`);
   }
 
   takeQuestion(room, kind) {
@@ -254,20 +256,27 @@ class GameManager {
     if(room.phase!=='answering'||!room.pending) throw new GameError('目前沒有等待作答的題目。');
     const pending=room.pending;
     if(!Number.isInteger(choice) || choice < 0 || choice >= 4) throw new GameError('請選擇有效的答案。');
-    const correct=choice===pending.question.correctIndex && Date.now()<=pending.expiresAt;
-    return this.resolveAnswer(room,player,correct);
+    const timedOut=Date.now()>pending.expiresAt;
+    const correct=choice===pending.question.correctIndex && !timedOut;
+    return this.resolveAnswer(room,player,correct,{reason:timedOut?'timeout':'answer'});
   }
 
-  resolveAnswer(room,player,correct) {
+  resolveAnswer(room,player,correct,{reason='answer'}={}) {
     const pending=room.pending;
     if(!pending || room.phase!=='answering') return;
     const q=pending.question;
-    player.attempted++;
-    if(correct) player.correct++;
+    if(reason!=='skipped') {
+      player.attempted++;
+      if(correct)player.correct++;
+      player.answerHistory.push({questionId:q.id,skill:BANK[q.kind]?.find(item=>item.id===q.id)?.skill||'multi',
+        result:correct?'correct':reason==='timeout'?'timeout':'wrong',at:Date.now()});
+    }
     room.pending=null;
     const result={correct,correctAnswer:q.correctText,explanation:q.explanation,at:Date.now()};
     room.lastResult=result;
-    message(room, `${correct?'✅':'❌'} ${player.name} ${correct?'答對了！':'未答對。'}正解是「${q.correctText}」。${q.explanation}`);
+    message(room,reason==='skipped'
+      ? `⏭️ 房主略過 ${player.name} 的題目（不列入學習統計）。正解是「${q.correctText}」。${q.explanation}`
+      : `${correct?'✅':'❌'} ${player.name} ${correct?'答對了！':reason==='timeout'?'作答逾時。':'未答對。'}正解是「${q.correctText}」。${q.explanation}`);
     if(pending.type==='boss') {
       const nextCount=pending.correctCount+Number(correct);
       if(pending.stage<2) {
@@ -418,9 +427,9 @@ class GameManager {
     if(room.phase!=='between' && !hostOverride) throw new GameError('請先完成當前擲骰／作答／購地流程。');
     if(hostOverride && room.phase==='answering' && room.pending) {
       const current=room.players.find(p=>p.id===room.currentPlayerId);
-      this.resolveAnswer(room,current,false);
+      this.resolveAnswer(room,current,false,{reason:'skipped'});
       // Boss 第一關失敗後會進入第二題，再跳一次可完成。
-      if(room.phase==='answering' && room.pending) this.resolveAnswer(room,current,false);
+      if(room.phase==='answering' && room.pending) this.resolveAnswer(room,current,false,{reason:'skipped'});
     }
     if(hostOverride && room.phase==='buying') room.pending=null;
     if(hostOverride && room.phase==='duel') {room.duel=null;message(room,'⏭️ 房主略過雙人對戰，本次不額外轉帳。');}
@@ -430,7 +439,7 @@ class GameManager {
     if(room.endsAt && Date.now()>=room.endsAt){this.finish(room);return;}
     room.turnIndex++;
     if(room.turnIndex>=room.players.length) {room.turnIndex=0;room.round++;}
-    if(room.round>room.roundLimit) {this.finish(room);return;}
+    if(room.roundLimit!==null && room.round>room.roundLimit) {this.finish(room);return;}
     room.currentPlayerId=room.players[room.turnIndex].id;
     const next=room.players[room.turnIndex];
     room.lastResult=null;
@@ -442,11 +451,11 @@ class GameManager {
       message(room, `⏳ ${skipped.name} 因救援失敗，這一回合暫停擲骰。`);
       room.turnIndex++;
       if(room.turnIndex>=room.players.length) {room.turnIndex=0;room.round++;}
-      if(room.round>room.roundLimit) {this.finish(room);return;}
+      if(room.roundLimit!==null && room.round>room.roundLimit) {this.finish(room);return;}
       room.currentPlayerId=room.players[room.turnIndex].id;
       safety++;
     }
-    message(room, `🎯 第 ${room.round} / ${room.roundLimit} 輪：輪到 ${room.players[room.turnIndex].name}！`);
+    message(room, `🎯 第 ${room.round} ${room.roundLimit===null?'輪（無輪數上限）':'/ '+room.roundLimit+' 輪'}：輪到 ${room.players[room.turnIndex].name}！`);
   }
 
   finish(room) {
@@ -471,11 +480,13 @@ class GameManager {
     room.status='lobby';room.phase='lobby';room.currentPlayerId=null;
     room.round=1;room.rankings=[];room.pending=null;room.properties={};
     room.lastRoll=null;room.lastResult=null;room.duel=null;room.lastDuel=null;room.endsAt=null;room.bonusStage=0;room.questionQueues={};
-    room.players.forEach(p=>{p.cash=0;p.properties=[];p.position=0;p.missedTurns=0;p.correct=0;p.attempted=0;});
+    room.players.forEach(p=>{p.cash=0;p.properties=[];p.position=0;p.missedTurns=0;p.correct=0;p.attempted=0;p.answerHistory=[];});
     message(room,'🔁 房主已開啟下一局，所有玩家保留座位。');
   }
 
-  publicState(room) {
+  publicState(room,viewerId=null) {
+    const finished=room.status==='finished';
+    const viewer=finished?room.players.find(p=>p.id===viewerId):null;
     return {
       code:room.code,status:room.status,phase:room.phase,round:room.round,
       roundLimit:room.roundLimit,startMoney:room.startMoney,currentPlayerId:room.currentPlayerId,
@@ -495,7 +506,9 @@ class GameManager {
              ? {title:room.pending.context.card.title,detail:room.pending.context.card.detail} : null,
            question:{id:room.pending.question.id,text:room.pending.question.text,
              options:room.pending.question.options},expiresAt:room.pending.expiresAt}),
-      log:room.log,rankings:room.rankings
+      log:room.log,rankings:room.rankings,
+      classFeedback:finished?summarizeClass(room.players):null,
+      personalFeedback:viewer?summarizePlayer(viewer.answerHistory):null
     };
   }
 
@@ -513,7 +526,7 @@ class GameManager {
       }
       if(room.pending?.expiresAt && room.pending.expiresAt<=now){
         const p=room.players.find(p=>p.id===room.currentPlayerId);
-        if(p){message(room,'⏰ 作答時間到，按未答對處理。');this.resolveAnswer(room,p,false);changed=true;}
+        if(p){message(room,'⏰ 作答時間到，按未答對處理。');this.resolveAnswer(room,p,false,{reason:'timeout'});changed=true;}
       }
       if(room.duel?.expiresAt && room.duel.expiresAt<=now){this.duelTimeout(room);changed=true;}
       // 時間結束時不截斷正在作答、購地或對戰的回合；完成後結算。

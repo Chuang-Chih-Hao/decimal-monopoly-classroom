@@ -17,7 +17,13 @@ app.get('/api/info',(_req,res)=>res.json({animals:ANIMALS,questions:TOTAL,maxPla
 app.use(express.static(path.join(__dirname,'public'),{index:'index.html',maxAge:0}));
 app.get('*',(_req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
 
-function broadcast(room) {io.to(room.code).emit('state',games.publicState(room));}
+// 每位玩家收到自己的個人學習回饋；他人的錯題紀錄不會廣播到全房間。
+function broadcast(room) {
+  for(const socketId of io.sockets.adapter.rooms.get(room.code)||[]) {
+    const peer=io.sockets.sockets.get(socketId);
+    if(peer)peer.emit('state',games.publicState(room,peer.data.playerId));
+  }
+}
 function reply(ack,ok,data={}) {if(typeof ack==='function')ack({ok,...data});}
 
 io.on('connection',(socket)=>{
@@ -51,7 +57,7 @@ io.on('connection',(socket)=>{
     player.socketId=socket.id;player.connected=true;
     socket.join(room.code);
     broadcast(room);
-    return {state:games.publicState(room),id:player.id,token:player.token,code:room.code};
+    return {state:games.publicState(room,player.id),id:player.id,token:player.token,code:room.code};
   }
   socket.on('create',action(({name,animal})=>{
     const {room,player}=games.newRoom(name,animal);

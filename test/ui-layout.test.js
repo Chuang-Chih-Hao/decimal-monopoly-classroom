@@ -46,3 +46,13 @@ test('網頁會載入地圖與色票，具有聚焦、自由縮放及我的資�
   assert.ok(app.includes('function focusMapTile('));
   assert.ok(app.includes('房產總值'));
 });
+
+test('前端開房選項支援無限輪，結算包含個人錯題與匿名全班分析',()=>{
+  assert.match(index,/value="unlimited" selected/);
+  assert.ok(index.includes('id="learning-feedback"'));
+  assert.ok(app.includes("rounds:$('round-select').value==='unlimited'"));
+  assert.ok(app.includes('state.roundLimit===null'));
+  assert.ok(app.includes('function renderLearningFeedback()'));
+  assert.ok(app.includes('state.personalFeedback'));
+  assert.ok(app.includes('state.classFeedback'));
+});

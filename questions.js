@@ -246,5 +246,36 @@ for(const [kind,list] of Object.entries(detailedPrompts)){
   });
 }
 
+// 學習診斷按「數學能力」分類，而不是用機會／寶箱等遊戲格子名稱。
+// 每題只指派一個主要能力；完整列舉以避免新增題目後未被正確分類。
+const SKILLS = Object.freeze({
+  addsub:{name:'小數加減與找零',tip:'將小數點對齊並補零，例如 18.2 可以寫成 18.20；注意題目問「剩下」還是「差多少」。'},
+  multiply:{name:'小數乘法與總價',tip:'先列出單價 × 數量，再檢查小數位數和答案單位；乘上小於 1 的數，結果會變小。'},
+  divide:{name:'小數除法與分裝',tip:'除數是小數時，先讓除數和被除數同乘 10 或 100 變成整數除法，再驗算。'},
+  discount:{name:'折扣、折數與省錢',tip:'打 7.5 折是付原價的 75%；折後售價＝原價 × 0.75，省下的金額＝原價－折後售價。'},
+  unit:{name:'單價換算與比價',tip:'先統一比較單位，例如元／公斤或元／公升；每單位價格＝總價 ÷ 數量，單價較低才划算。'},
+  multi:{name:'多步驟生活應用',tip:'把題目拆成小步驟：先求商品總價或折後價格，再計算找零、加運費或減優惠。'}
+});
+const SKILL_ASSIGNMENTS = {
+  purchase:['multiply','unit','multiply','unit','multiply','multiply','unit','multiply','unit','multi'],
+  calc:['divide','multiply','divide','multiply','addsub','multiply','divide','addsub','divide','divide','divide','multiply'],
+  discount:Array(10).fill('discount'),
+  compare:Array(10).fill('unit'),
+  scam:['discount','unit','divide','discount','discount','multiply','addsub','unit','multiply'],
+  chest:['multiply','divide','multiply','addsub','divide','multiply','multiply','addsub'],
+  chance:['discount','multiply','addsub','multiply','multiply','discount','multiply','addsub'],
+  fate:['multiply','discount','multiply','addsub','unit','multi','multiply','multiply'],
+  boss:['multi','unit','unit','multi','divide','multi','multiply','multi'],
+  rescue:['addsub','multiply','addsub','divide','multiply','discount','divide','unit']
+};
+for (const [kind,questions] of Object.entries(BANK)) {
+  const assignments=SKILL_ASSIGNMENTS[kind];
+  if(!assignments||assignments.length!==questions.length)throw new Error(`題型分類數量錯誤：${kind}`);
+  questions.forEach((question,index)=>{
+    const skill=assignments[index];
+    if(!SKILLS[skill])throw new Error(`未知題型分類：${question.id}`);
+    question.skill=skill;
+  });
+}
 const TOTAL = Object.values(BANK).reduce((sum, list) => sum + list.length, 0);
-module.exports = { BANK, TOTAL };
+module.exports = { BANK, TOTAL, SKILLS };

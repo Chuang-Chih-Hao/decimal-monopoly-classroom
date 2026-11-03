@@ -321,3 +321,114 @@ test('小遊戲由房主略過時不進行額外轉帳',()=>{
   assert.equal(room.duel,null);
   assert.equal(room.currentPlayerId,host.id);
 });
+
+// v1.4：無限輪與學習回饋
+const {SKILLS}=require('../questions');
+const {summarizePlayer,summarizeClass}=require('../feedback');
+
+test('開房提供無限輪設定；合法值不會被轉成 NaN，非法值會拒絕',()=>{
+  const g=new GameManager();const {room,player:host}=g.newRoom('教師','capybara');
+  g.join(room.code,'小安','🐈');
+  assert.throws(()=>g.start(room,host.id,{rounds:'forever'}),GameError);
+  g.start(room,host.id,{rounds:'unlimited',durationMinutes:30});
+  assert.equal(room.roundLimit,null);
+  assert.equal(g.publicState(room).roundLimit,null);
+  assert.ok(room.endsAt-Date.now()>29*60*1000);
+});
+
+test('無限輪跑超過 12 輪不會提前結算；30 分鐘時仍會自動結束',()=>{
+  const g=new GameManager();const {room,player:host}=g.newRoom('教師','capybara');
+  g.join(room.code,'小安','🐈');
+  g.start(room,host.id,{rounds:'unlimited',durationMinutes:30});
+  for(let i=0;i<30;i++)g.nextTurn(room,host.id,true);
+  assert.equal(room.round,16);
+  assert.equal(room.status,'playing');
+  room.endsAt=Date.now()-1;
+  g.tick(()=>{});
+  assert.equal(room.status,'finished');
+  assert.equal(room.rankings.length,2);
+});
+
+test('有限輪仍依正常規則結算；房主在無限輪可主動提前結算',()=>{
+  const {game,room,host}=setup();
+  room.roundLimit=2;
+  for(let i=0;i<4;i++)game.nextTurn(room,host.id,true);
+  assert.equal(room.status,'finished');
+  const g=new GameManager();const created=g.newRoom('教師','capybara');
+  g.join(created.room.code,'學生','🐈');g.start(created.room,created.player.id,{rounds:'unlimited'});
+  g.finishByHost(created.room,created.player.id);
+  assert.equal(created.room.status,'finished');
+});
+
+test('91 道題目均有一個有效的數學能力分類，包括機會、命運、Boss',()=>{
+  for(const qs of Object.values(BANK))for(const q of qs){
+    assert.ok(SKILLS[q.skill],`${q.id} 沒有正確技能標籤`);
+  }
+  assert.equal(BANK.chance[0].skill,'discount');
+  assert.equal(BANK.chance[1].skill,'multiply');
+  assert.equal(BANK.boss[2].skill,'unit');
+  assert.equal(BANK.scam[4].skill,'discount');
+});
+
+test('依實際數學能力分類錯題；錯誤數與正確率、解析都正確',()=>{
+  const {game,room,host,student}=setup();
+  room.questionQueues.chance=[BANK.chance[0].id];
+  game.ask(room,'chance');
+  assert.equal(room.pending.question.id,'chance-1');
+  game.answer(room,host.id,chooseWrong(room));
+  room.questionQueues.chance=[BANK.chance[1].id];
+  game.ask(room,'chance');game.answer(room,host.id,chooseCorrect(room));
+  game.finishByHost(room,host.id);
+  const feedback=game.publicState(room,host.id).personalFeedback;
+  assert.equal(feedback.attempted,2);
+  assert.equal(feedback.correct,1);
+  assert.equal(feedback.accuracy,50);
+  assert.equal(feedback.weakSkills[0].name,'折扣、折數與省錢');
+  assert.equal(feedback.weakSkills[0].wrong,1);
+  assert.equal(feedback.examples[0].questionId,'chance-1');
+  assert.match(feedback.examples[0].explanation,/解題步驟/);
+  assert.equal(game.publicState(room,student.id).personalFeedback.attempted,0);
+  assert.equal(game.publicState(room).personalFeedback,null);
+  assert.equal(game.publicState(room,student.id).classFeedback.attempted,2);
+  assert.equal(game.publicState(room,student.id).classFeedback.bySkill.find(s=>s.key==='discount').wrong,1);
+  assert.equal(JSON.stringify(game.publicState(room,student.id)).includes(BANK.chance[0].question),false);
+});
+
+test('逾時與選錯分開標註，超時按答案亦視為逾時',()=>{
+  const {game,room,host}=setup();
+  game.ask(room,'calc');room.pending.expiresAt=Date.now()-10;
+  game.answer(room,host.id,chooseCorrect(room));
+  game.finishByHost(room,host.id);
+  const feedback=game.publicState(room,host.id).personalFeedback;
+  assert.equal(feedback.attempted,1);
+  assert.equal(feedback.timedOut,1);
+  assert.equal(feedback.weakSkills[0].timedOut,1);
+  assert.equal(feedback.examples[0].timedOut,true);
+});
+
+test('教師跳過題目不列入學習弱項，重新開局清除舊資料',()=>{
+  const {game,room,host}=setup();
+  game.ask(room,'calc');
+  game.nextTurn(room,host.id,true);
+  assert.equal(host.attempted,0);
+  assert.equal(host.answerHistory.length,0);
+  game.nextTurn(room,host.id,true); // 重新輪到教師角色
+  game.ask(room,'discount');
+  game.answer(room,host.id,chooseWrong(room));
+  game.finishByHost(room,host.id);
+  assert.equal(game.publicState(room,host.id).personalFeedback.wrong,1);
+  game.reset(room,host.id);
+  assert.equal(host.answerHistory.length,0);
+  assert.equal(game.publicState(room,host.id).personalFeedback,null);
+  game.start(room,host.id,{rounds:'unlimited'});
+  assert.equal(game.publicState(room,host.id).personalFeedback,null);
+});
+
+test('未答題者有空白學習報告，不以空樣本判定弱項',()=>{
+  const blank=summarizePlayer([]);
+  assert.equal(blank.attempted,0);
+  assert.equal(blank.accuracy,null);
+  assert.deepEqual(blank.weakSkills,[]);
+  assert.deepEqual(blank.examples,[]);
+  assert.equal(summarizeClass([{answerHistory:[]}]).attempted,0);
+});
