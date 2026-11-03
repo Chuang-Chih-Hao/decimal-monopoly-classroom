@@ -1,7 +1,7 @@
 /* 小數富翁前端：所有資產、擲骰、判分都以伺服器狀態為準。 */
 (() => {
   'use strict';
-  const CLIENT_VERSION='1.7.1';
+  const CLIENT_VERSION='1.7.2';
   const socket=io({transports:['websocket','polling'],reconnection:true});
   const $=id=>document.getElementById(id);
   const esc=(value)=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -612,6 +612,27 @@
       },1700);
     }
   }
+
+  // v1.7.2：只有進行數學答題或劇情選擇時，才讓題目優先顯示在資產下方。
+  // 答題結束（含「答對後決定購地」）會恢復操作區在上、解析在下的順序。
+  // 移動既有節點而不是重建面板，保留按鈕事件及展開的成就區狀態。
+  function syncQuestionPanelPosition(){
+    const sidebar=document.querySelector('.side-column');
+    const question=$('question-panel');
+    const current=sidebar?.querySelector('.current-panel');
+    const result=$('result-panel');
+    if(!sidebar||!question||!current||!result)return;
+    const questionFirst=state?.status==='playing'
+      && (state.phase==='answering'||state.phase==='story')
+      && !question.hidden;
+    sidebar.classList.toggle('question-priority',questionFirst);
+    if(questionFirst){
+      if(question.nextElementSibling!==current)sidebar.insertBefore(question,current);
+    }else if(question.nextElementSibling!==result){
+      // 讓購地確認在回合操作區下方；解題解析一律在回合操作區之後。
+      sidebar.insertBefore(question,result);
+    }
+  }
   function renderPlaying(){
     $('round-chip').textContent=state.roundLimit===null?`第 ${state.round} 輪 · ♾️ 無限輪`:`第 ${state.round} / ${state.roundLimit} 輪`;
     updateSessionClock();
@@ -621,6 +642,7 @@
       ?`<div class="current-identity" style="${colorStyle(current)}"><div class="active-animal">${animalHtml(current.animal)}</div><div><div class="active-name">${esc(current.name)}${isMyTurn()?' ✨':''}</div><div class="active-sub"><span class="person-color-dot"></span>${colorFor(current).name}棋子 · 現金 ${money(current.cash)} · ${current.properties.length} 處房產</div></div></div>`:'';
     if(!activeRollAnimation?.started)renderBoard();
     renderTurnActions();renderQuestion();renderDuel();renderResult();renderMyAssets();renderAchievements();renderScoreboard();renderLog();
+    syncQuestionPanelPosition();
     $('teacher-panel').hidden=!isHost();
   }
   function renderTurnActions(){

@@ -582,3 +582,13 @@
 .achievement-content{padding:0 14px 14px}
 .achievement-content .achievement-current{margin:11px 0}
 @media(max-width:480px){.achievement-summary{padding:11px 12px}.achievement-summary-meta{font-size:10px}.achievement-content{padding:0 11px 12px}}
+
+/* v1.7.2：提昇數學題的視覺優先度。641～960px 平板採單列，
+   避免「資產」與「題目」被兩欄格線排成同一列。 */
+@media(min-width:641px) and (max-width:960px){
+  .side-column > .my-assets-panel,
+  .side-column > .current-panel,
+  .side-column > .duel-panel,
+  .side-column > .question-panel,
+  .side-column > .result-panel{grid-column:1/-1}
+}

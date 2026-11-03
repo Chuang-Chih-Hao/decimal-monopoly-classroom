@@ -263,3 +263,61 @@ test('v1.7.1 成就面板更新時保留使用者展開狀態與原有稱號切�
   assert.match(style,/\.achievement-panel:not\(\[open\]\) \.achievement-summary-toggle::after/);
   assert.match(style,/\.achievement-panel\[open\] \.achievement-summary-toggle::after/);
 });
+
+// v1.7.2：答題階段動態將題目移至資產下方，解完題後還原。
+test('v1.7.2 答題優先：題目移到資產後、操作前；完成後操作回到上方，解析仍在下方',()=>{
+  const start=app.indexOf('function syncQuestionPanelPosition(){');
+  const end=app.indexOf('  function renderPlaying(){',start);
+  assert.ok(start>=0 && end>start,'應有獨立的側欄順序函式');
+  const source=app.slice(start,end);
+  const names=['my-assets-panel','current-panel','duel-panel','question-panel','result-panel','ranking-panel','achievement-panel'];
+  const nodes=new Map(names.map(id=>[id,{id,hidden:id==='question-panel'}]));
+  const current=nodes.get('current-panel');
+  const sidebar={
+    children:[...nodes.values()],
+    classList:{priority:false,toggle(name,enabled){assert.equal(name,'question-priority');this.priority=enabled;}},
+    querySelector(selector){assert.equal(selector,'.current-panel');return current;},
+    insertBefore(child,reference){
+      this.children.splice(this.children.indexOf(child),1);
+      this.children.splice(this.children.indexOf(reference),0,child);
+    }
+  };
+  nodes.forEach(node=>{
+    Object.defineProperty(node,'nextElementSibling',{get(){return sidebar.children[sidebar.children.indexOf(this)+1]||null;}});
+  });
+  const $=id=>nodes.get(id);
+  const document={querySelector:selector=>selector==='.side-column'?sidebar:null};
+  const order=()=>sidebar.children.map(node=>node.id);
+  const state={status:'playing',phase:'rolling'};
+  const sync=new Function('document','$','state',source+'\nreturn syncQuestionPanelPosition;')(document,$,state);
+  sync();
+  assert.ok(order().indexOf('current-panel')<order().indexOf('result-panel'));
+  nodes.get('question-panel').hidden=false;
+  state.phase='answering';sync();
+  assert.deepEqual(order().slice(0,3),['my-assets-panel','question-panel','current-panel']);
+  assert.equal(sidebar.classList.priority,true);
+  assert.ok(order().indexOf('result-panel')>order().indexOf('current-panel'));
+  // 房主／學生從數學題進入購地確認，操作區先恢復靠上。
+  state.phase='buying';sync();
+  assert.deepEqual(order().slice(0,2),['my-assets-panel','current-panel']);
+  assert.ok(order().indexOf('question-panel')>order().indexOf('current-panel'));
+  assert.ok(order().indexOf('result-panel')>order().indexOf('current-panel'));
+  state.phase='story';sync();
+  assert.deepEqual(order().slice(0,3),['my-assets-panel','question-panel','current-panel']);
+  nodes.get('question-panel').hidden=true;
+  state.phase='between';sync();
+  assert.deepEqual(order().slice(0,2),['my-assets-panel','current-panel']);
+  assert.ok(order().indexOf('result-panel')>order().indexOf('current-panel'));
+  assert.equal(sidebar.classList.priority,false);
+  assert.ok(app.includes('syncQuestionPanelPosition();'));
+});
+
+test('v1.7.2 題目優先狀態在平板上獨佔一列，解析依然跟隨操作區',()=>{
+  const css=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
+  assert.match(css,/@media\(min-width:641px\) and \(max-width:960px\)/);
+  assert.match(css,/\.side-column > \.my-assets-panel,[\s\S]*?\.side-column > \.question-panel,[\s\S]*?\.side-column > \.result-panel\{grid-column:1\/-1\}/);
+  assert.ok(index.includes('id="question-panel"'));
+  assert.ok(index.includes('id="result-panel"'));
+  assert.ok(index.includes('id="achievement-panel"'));
+  assert.ok(index.includes('class="panel current-panel"'));
+});
