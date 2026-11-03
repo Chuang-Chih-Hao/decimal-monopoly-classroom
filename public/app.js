@@ -13,6 +13,14 @@
   let selectedAnimal='capybara';
   let state=null,me=null;
   let toastTimer;
+  let spotlightTimer;
+  let seenRollId=null;
+  let seenLogId=null;
+  let activeRollAnimation=null;
+  let animationNonce=0;
+  let deferredFeedback=null;
+  const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
+  const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   let tokenData=null;
   try {tokenData=JSON.parse(localStorage.getItem('decimal-monopoly-session')||'null');}catch{tokenData=null;}
 
@@ -25,7 +33,60 @@
     tokenData={code:data.code,token:data.token,id:data.id};me=data.id;
     try{localStorage.setItem('decimal-monopoly-session',JSON.stringify(tokenData));}catch{}
   }
-  function clearSession(){tokenData=null;me=null;state=null;try{localStorage.removeItem('decimal-monopoly-session');}catch{}showEntry();}
+  function clearSession(){
+    animationNonce++;activeRollAnimation=null;deferredFeedback=null;
+    seenRollId=null;seenLogId=null;
+    $('event-spotlight').hidden=true;
+    tokenData=null;me=null;state=null;
+    try{localStorage.removeItem('decimal-monopoly-session');}catch{}
+    showEntry();
+  }
+  // 首次加入／重新連線時，以伺服器畫面為準，不重播已經結束的擲骰。
+  function setInitialState(next){
+    animationNonce++;activeRollAnimation=null;deferredFeedback=null;
+    state=next;
+    seenRollId=next.lastRoll?.id??null;
+    seenLogId=next.log?.[0]?.id??null;
+    render();
+  }
+  function showSpotlight(icon,title,detail='',kind='event'){
+    const box=$('event-spotlight');
+    if(!box)return;
+    box.hidden=false;box.className=`event-spotlight kind-${kind}`;
+    box.innerHTML=`<span class="spotlight-icon">${esc(icon)}</span><div class="spotlight-copy"><strong>${esc(title)}</strong><span>${esc(detail)}</span></div>`;
+    // 重新播放彈出動畫，所有玩家都能注意到最新事件。
+    void box.offsetWidth;
+    box.classList.add('is-visible');
+    clearTimeout(spotlightTimer);
+    spotlightTimer=setTimeout(()=>{box.classList.remove('is-visible');setTimeout(()=>{if(!box.classList.contains('is-visible'))box.hidden=true;},260);},3100);
+  }
+  function highlightNewEvents(previous,next){
+    if(!previous||next.status!=='playing')return;
+    const result=next.lastResult;
+    if(result && result.at!==previous.lastResult?.at){
+      const before=previous.players?.find(p=>p.id===next.currentPlayerId);
+      const after=next.players?.find(p=>p.id===next.currentPlayerId);
+      const delta=before&&after?after.cash-before.cash:0;
+      const cashChange=delta>0?`｜💰 獲得 ${money(delta)}`:delta<0?`｜💸 支出 ${money(-delta)}`:'';
+      const item={icon:result.correct?'✅':'📘',title:result.correct?'答對了！數學挑戰成功':'再試著理解這題！',detail:`正確答案：${result.correctAnswer}${cashChange}`,kind:result.correct?'success':'warning'};
+      if(activeRollAnimation)deferredFeedback=item;
+      else showSpotlight(item.icon,item.title,item.detail,item.kind);
+      return;
+    }
+    const previousId=previous.log?.[0]?.id;
+    const fresh=[];
+    for(const log of next.log||[]){
+      if(log.id===previousId)break;
+      fresh.push(log);
+    }
+    const selected=fresh.find(l=>/買下|過路費|救援成功|救援未成功|繳交稅金|獲得|失去|抽中|暫停|完成|放棄購買/.test(l.text));
+    if(!selected)return;
+    const positive=/買下|救援成功|獲得|抽中/.test(selected.text);
+    const item={icon:positive?'🌟':'📣',title:selected.text.slice(0,34),detail:selected.text.length>34?selected.text.slice(34,100):'',kind:positive?'success':'event'};
+    if(activeRollAnimation)deferredFeedback=item;
+    else showSpotlight(item.icon,item.title,item.detail,item.kind);
+  }
+
   function request(event,payload={},done){
     if(!socket.connected){showToast('尚未連線，請檢查網路。',true);return;}
     socket.timeout(10000).emit(event,payload,(err,response)=>{
@@ -49,12 +110,12 @@
 
   $('create-btn').addEventListener('click',()=>{
     const name=$('player-name').value.trim();if(!name){showToast('請先輸入冒險家暱稱。',true);return;}
-    request('create',{name,animal:selectedAnimal},(ok,data)=>{if(ok){saveSession(data);state=data.state;render();showToast('已建立房間！把代碼傳給同學。');}});
+    request('create',{name,animal:selectedAnimal},(ok,data)=>{if(ok){saveSession(data);setInitialState(data.state);showToast('已建立房間！把代碼傳給同學。');}});
   });
   $('join-btn').addEventListener('click',()=>{
     const name=$('player-name').value.trim(),code=$('room-code').value.trim().toUpperCase();
     if(!name||!code){showToast('請輸入暱稱和房間代碼。',true);return;}
-    request('join',{code,name,animal:selectedAnimal},(ok,data)=>{if(ok){saveSession(data);state=data.state;render();showToast('加入成功！');}});
+    request('join',{code,name,animal:selectedAnimal},(ok,data)=>{if(ok){saveSession(data);setInitialState(data.state);showToast('加入成功！');}});
   });
   ['player-name','room-code'].forEach(id=>$(id).addEventListener('keydown',e=>{if(e.key==='Enter')$(id==='room-code'?'join-btn':'create-btn').click();}));
   $('copy-room-btn').addEventListener('click',async()=>{
@@ -80,7 +141,7 @@
     $('connection').className='connection online';$('connection').innerHTML='<span class="status-dot"></span>已連線';
     if(tokenData){
       request('resume',{code:tokenData.code,token:tokenData.token},(ok,data)=>{
-        if(ok){saveSession(data);state=data.state;render();}
+        if(ok){saveSession(data);setInitialState(data.state);}
         else {clearSession();showToast('原先的房間不存在或已過期，請重新進入。',true);}
       });
     } else if(!me)showEntry();
@@ -88,7 +149,26 @@
   socket.on('disconnect',()=>{
     $('connection').className='connection offline';$('connection').innerHTML='<span class="status-dot"></span>重新連線中';
   });
-  socket.on('state',next=>{state=next;if(me)render();});
+  socket.on('state',next=>{
+    if(!me)return;
+    const previous=state;
+    const isNewRoll=next.status==='playing'&&!!next.lastRoll?.id&&next.lastRoll.id!==seenRollId;
+    if(next.status!=='playing'){
+      animationNonce++;activeRollAnimation=null;deferredFeedback=null;
+      if(!next.lastRoll)seenRollId=null;
+    }
+    if(isNewRoll){
+      seenRollId=next.lastRoll.id;
+      animationNonce++;
+      activeRollAnimation={...next.lastRoll,started:false};
+      deferredFeedback=null;
+    }
+    state=next;
+    render();
+    if(isNewRoll)void playRollAnimation(next.lastRoll,animationNonce);
+    else highlightNewEvents(previous,next);
+    seenLogId=next.log?.[0]?.id??null;
+  });
   socket.on('roomClosed',()=>{clearSession();showToast('房主已解散房間。',true);});
   socket.on('superseded',()=>{state=null;me=null;showEntry();showToast('此角色已在另一個分頁連線，這裡停止操作。',true);});
 
@@ -132,11 +212,12 @@
     const board=$('board');board.innerHTML='';
     state.board.forEach(tile=>{
       const pos=positionFor(tile.id),el=document.createElement('div');
-      el.className=`tile ${tile.type}${tile.group?' group-'+tile.group:''}${state.players.some(p=>p.position===tile.id)?' active-tile':''}${state.properties[tile.id]?' owned':''}`;
+      el.className=`tile ${tile.type}${tile.group?' group-'+tile.group:''}${state.players.some(p=>p.position===tile.id && p.id!==activeRollAnimation?.playerId)?' active-tile':''}${state.properties[tile.id]?' owned':''}`;
+      el.dataset.tileId=String(tile.id);
       el.style.setProperty('--r',pos.r);el.style.setProperty('--c',pos.c);
       el.title=tile.type==='property'?`${tile.name}：購地 ${money(tile.price)}，租金 ${money(tile.rent)}`:`${tile.name}：${tile.tip||''}`;
       const owner=state.players.find(p=>p.id===state.properties[tile.id]);
-      const pawns=state.players.filter(p=>p.position===tile.id);
+      const pawns=state.players.filter(p=>p.position===tile.id && p.id!==activeRollAnimation?.playerId);
       el.innerHTML=`<span class="tile-icon">${esc(tile.icon)}</span><span class="tile-name">${esc(tile.name)}</span>`
         +(tile.price?`<span class="tile-price">${money(tile.price)}</span>`:'')
         +(owner?`<span class="owner-mini" title="${esc(owner.name)} 的房產">${animalHtml(owner.animal)}</span>`:'')
@@ -149,18 +230,91 @@
     center.innerHTML=`<div class="center-content"><div class="center-logo">🌴 💰 🎲</div><div class="center-title">小數富翁<br/>探險島</div><div class="center-desc">${text}<br/>買店面・算折扣・破解陷阱</div>${last?`<span class="dice-face" aria-label="${last.die} 點">${diceIcons[last.die]}</span>`:''}</div>`;
     board.appendChild(center);
   }
+  // 伺服器先決定唯一的點數與終點；前端只重播同一個結果，不自行擲骰。
+  async function playRollAnimation(roll,nonce){
+    const current=activeRollAnimation;
+    if(!current||current.id!==roll.id)return;
+    current.started=true;
+    const board=$('board');
+    const center=board.querySelector('.board-center');
+    if(!center)return;
+    const player=state.players.find(p=>p.id===roll.playerId);
+    const playerName=player?.name||'玩家';
+    const stage=document.createElement('div');
+    stage.className='dice-stage';
+    stage.innerHTML=`<span class="dice-stage-label">🎲 ${esc(playerName)} 正在擲骰…</span><span class="dice-rolling-face" aria-label="骰子滾動中">⚀</span><span class="dice-stage-count">準備前進！</span>`;
+    center.appendChild(stage);
+    const dice=stage.querySelector('.dice-rolling-face');
+    let index=0;
+    const ticking=setInterval(()=>{dice.textContent=diceIcons[(index++%6)+1];},85);
+    const valid=()=>animationNonce===nonce&&activeRollAnimation?.id===roll.id&&state?.status==='playing';
+    await sleep(reducedMotion?260:900);
+    clearInterval(ticking);
+    if(!valid())return;
+    dice.textContent=diceIcons[roll.die];
+    dice.setAttribute('aria-label',`${roll.die} 點`);
+    stage.classList.add('dice-show-result');
+    stage.querySelector('.dice-stage-label').textContent=`🎲 ${playerName} 擲出`;
+    stage.querySelector('.dice-stage-count').textContent=`${roll.die} 點！`;
+    await sleep(reducedMotion?330:650);
+    if(!valid())return;
+    stage.remove();
+    const mover=document.createElement('div');
+    mover.className='moving-pawn';
+    mover.innerHTML=animalHtml(player?.animal||'🐾');
+    mover.setAttribute('aria-label',`${playerName} 正在前進`);
+    board.appendChild(mover);
+    const locate=id=>{
+      const tile=board.querySelector(`[data-tile-id="${id}"]`);
+      if(!tile)return;
+      board.querySelectorAll('.tile-move-target').forEach(x=>x.classList.remove('tile-move-target'));
+      tile.classList.add('tile-move-target');
+      // 以棋盤座標而不是視窗座標定位，縮放螢幕仍能逐格移動。
+      mover.style.left=`${tile.offsetLeft+tile.offsetWidth/2}px`;
+      mover.style.top=`${tile.offsetTop+tile.offsetHeight/2}px`;
+    };
+    mover.classList.add('position-instant');
+    locate(roll.from);
+    await sleep(40);
+    mover.classList.remove('position-instant');
+    for(let step=1;step<=roll.die;step++){
+      if(!valid())return;
+      locate((roll.from+step)%state.board.length);
+      await sleep(reducedMotion?90:260);
+    }
+    if(!valid())return;
+    await sleep(reducedMotion?100:340);
+    if(!valid())return;
+    activeRollAnimation=null;
+    renderBoard();renderTurnActions();renderQuestion();
+    const tile=state.board[roll.position];
+    const card=state.pending?.card;
+    // 直接付租金、繳稅或領補給金時不會再有問答事件，必須在到站提示裡清楚呈現。
+    const immediate=(state.log||[]).find(l=>l.at>=roll.at&&/支付.*過路費|免繳過路費|休息補給|繳交稅金|現金不足/.test(l.text));
+    const passStart=roll.from+roll.die>=state.board.length?'｜🏁 經過起點，領到 $200':'';
+    const outcome=card?`${card.title}：${card.detail}`:(immediate?.text||tile?.tip||'準備接受下一個挑戰！');
+    showSpotlight(tile?.icon||'🎲',`${playerName} 前進 ${roll.die} 格，抵達「${tile?.name||'目的地'}」`,`${outcome}${passStart}`,'event');
+    if(deferredFeedback){
+      const queued=deferredFeedback;deferredFeedback=null;
+      setTimeout(()=>{
+        if(animationNonce===nonce)showSpotlight(queued.icon,queued.title,queued.detail,queued.kind);
+      },1700);
+    }
+  }
   function renderPlaying(){
     $('round-chip').textContent=`第 ${state.round} / ${state.roundLimit} 輪`;
     $('turn-status').textContent=isMyTurn()?'換你啦！':'等待中';
     const current=activePlayer();
     $('current-player').innerHTML=current
       ?`<div class="active-animal">${animalHtml(current.animal)}</div><div><div class="active-name">${esc(current.name)}${isMyTurn()?' ✨':''}</div><div class="active-sub">💰 ${money(current.cash)} · 🏠 ${current.properties.length} 處房產</div></div>`:'';
-    renderBoard();renderTurnActions();renderQuestion();renderResult();renderScoreboard();renderLog();
+    if(!activeRollAnimation?.started)renderBoard();
+    renderTurnActions();renderQuestion();renderResult();renderScoreboard();renderLog();
     $('teacher-panel').hidden=!isHost();
   }
   function renderTurnActions(){
     const el=$('turn-actions');el.innerHTML='';
     const turn=isMyTurn(),phase=state.phase;
+    if(activeRollAnimation){el.innerHTML='<div class="phase-help action-moving">🎲 骰子已擲出！正在沿著地圖逐格前進…</div>';return;}
     if(phase==='rolling'){
       el.innerHTML=turn?'<button id="roll-btn" class="btn primary roll-btn">🎲 擲骰子！</button><div class="phase-help">點擊後會沿著地圖前進 1～6 格。</div>':`<div class="phase-help">等待 ${esc(activePlayer()?.name)} 擲骰子…</div>`;
       $('roll-btn')?.addEventListener('click',()=>request('roll'));
@@ -177,7 +331,7 @@
     const el=$('question-panel'),p=state.pending;
     if(!p || (p.type!=='buying'&&!p.question)){el.hidden=true;return;}
     el.hidden=false;
-    const turn=isMyTurn();
+    const turn=isMyTurn()&&!activeRollAnimation;
     if(p.type==='buying'){
       const tile=state.board.find(t=>t.id===p.tileId);
       el.innerHTML=`<div class="question-tag">🏡 購買土地</div><h3>恭喜通過計算！你要買下「${esc(tile.name)}」嗎？</h3><div class="buy-info"><strong>購地 ${money(tile.price)}</strong><small>未來其他玩家走到這格，將支付租金 ${money(tile.rent)} 給你。</small></div>${turn?'<div class="buy-actions"><button id="buy-yes" class="btn primary">💰 買下它！</button><button id="buy-no" class="btn outline">這次不要</button></div>':'<p class="question-hint">等這回合的玩家做決定…</p>'}`;
@@ -218,7 +372,9 @@
   }
   function wealth(p){return p.cash+p.properties.reduce((sum,id)=>sum+(state.board[id]?.price||0),0);}
   function renderLog(){
-    $('history').innerHTML=state.log.map(l=>`<div class="log-line"><time>${new Date(l.at).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}</time>${esc(l.text)}</div>`).join('');
+    const current=state.log?.[0]?.id;
+    const newEntry=!!seenLogId&&current!==seenLogId;
+    $('history').innerHTML=state.log.map((l,i)=>`<div class="log-line${i===0?' latest':''}${i===0&&newEntry?' just-added':''}"><time>${new Date(l.at).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}</time>${esc(l.text)}</div>`).join('');
   }
   function renderEnd(){
     $('end-rankings').innerHTML=state.rankings.map((r,i)=>`<div class="end-row"><strong>${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</strong><span class="avatar">${animalHtml(r.animal)}</span><div><strong>${esc(r.name)}</strong><div class="end-stats">現金 ${money(r.cash)} ＋ 房產 ${money(r.landValue)} · 答對 ${r.correct}/${r.attempted}</div></div><div class="end-amount">${money(r.score)}</div></div>`).join('');

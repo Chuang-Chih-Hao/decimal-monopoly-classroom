@@ -185,7 +185,7 @@ class GameManager {
     const die=1+Math.floor(Math.random()*6);
     const prev=player.position;
     const next=(prev+die)%BOARD.length;
-    player.position=next; room.lastRoll={playerId,die,position:next,at:Date.now()};
+    player.position=next; room.lastRoll={id:randomUUID(),playerId,die,from:prev,position:next,at:Date.now()};
     room.lastResult=null;
     if (prev+die>=BOARD.length) {
       changeCash(player,200);

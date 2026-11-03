@@ -63,7 +63,7 @@
           <div class="section-head"><div><span class="overline">DECIMAL ISLAND</span><h2>小數富翁地圖</h2></div><div id="round-chip" class="round-chip">第 1 / 8 輪</div></div>
           <div class="board-wrapper"><div id="board" class="board" aria-label="大富翁遊戲棋盤"><div id="board-center" class="board-center"></div></div></div>
           <div class="board-legend"><span><b class="legend-square prop"></b>可購買店面</span><span><b class="legend-square event"></b>答題事件</span><span>🏁 經過起點 +$200</span></div>
-          <section class="panel history-panel"><h3>📣 冒險紀錄</h3><div id="history" class="history" aria-live="polite"></div></section>
+          <section class="panel history-panel"><h3>📣 冒險紀錄 <small>最新事件置頂</small></h3><div id="history" class="history" aria-live="polite"></div></section>
         </section>
         <aside class="side-column">
           <section class="panel current-panel"><div class="side-eyebrow">NOW PLAYING <span id="turn-status" class="mini-badge">進行中</span></div><div id="current-player" class="current-player"></div><div id="turn-actions" class="turn-actions"></div></section>
@@ -81,6 +81,7 @@
       <button id="restart-btn" class="btn primary" hidden>🔄 原班人馬，再玩一局</button>
     </section>
   </main>
+  <div id="event-spotlight" class="event-spotlight" role="status" aria-live="polite" aria-atomic="true" hidden></div>
   <div id="toast" class="toast" role="alert" aria-live="assertive" hidden></div>
   <footer class="footer">📚 六年級小數應用教學遊戲 <span>·</span> 答錯也能學會，計算才是超能力！</footer>
 </div>

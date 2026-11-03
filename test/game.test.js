@@ -135,3 +135,31 @@ test('問答逾時視為答錯、題目會在同類型用完前不重複',()=>{
   assert.equal(room.phase,'between');
   assert.equal(host.attempted,1);
 });
+
+
+test('每次擲骰附有唯一事件 ID、起點與終點，供全房間重播動畫',()=>{
+  const {game,room,host,student}=setup();
+  host.position=23;
+  forceDie(game,room,host.id,3);
+  const first=game.publicState(room).lastRoll;
+  assert.match(first.id,/^[0-9a-f-]{36}$/);
+  assert.equal(first.from,23);
+  assert.equal(first.position,2);
+  assert.equal(first.die,3);
+  game.nextTurn(room,host.id,true);
+  forceDie(game,room,student.id,2);
+  const second=game.publicState(room).lastRoll;
+  assert.notEqual(first.id,second.id);
+  assert.equal(second.from,0);
+  assert.equal(second.position,2);
+});
+
+test('80 元打 7.5 折：省下 20 元、售價 60 元的題目解析完整且不混淆',()=>{
+  const discount=BANK.discount.find(q=>q.question.includes('原價 80 元'));
+  const scam=BANK.scam.find(q=>q.question.includes('原價 80 元'));
+  assert.ok(discount);assert.equal(discount.answer,'20 元');
+  assert.match(discount.explanation,/80 × 0\.75 = 60/);
+  assert.match(discount.explanation,/80 − 60 = 20/);
+  assert.ok(scam);assert.equal(scam.answer,'60 元');
+  assert.match(scam.explanation,/多收了 10 元/);
+});
