@@ -190,3 +190,15 @@ test('專屬動畫不應把第 25 格比價站當成休息站，也不覆蓋格�
   assert.doesNotMatch(style,/\.board \.tile>\*:not\(\.tile-ambient\)/);
   assert.ok(app.includes('for(const tileId of tileEffectTimers.keys())clearTileEffect(tileId)'));
 });
+
+
+// v1.6.6：到格及購地動畫不能與原本格子圖示疊在一起。
+test('格子動畫期間隱藏原主圖及常駐裝飾，完成或中斷後自動恢復',()=>{
+  const style=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
+  assert.match(style,/\.board \.tile\.tile-effect-active > \.tile-icon,\s*\.board \.tile\.tile-effect-active > \.tile-ambient\s*\{\s*visibility:hidden;/);
+  assert.ok(app.includes("tile.classList.add('tile-effect-active')"),'動畫開始時應套用隱藏狀態');
+  assert.ok(app.includes("tile.classList.remove('tile-effect-active','tile-effect-build')"),'正常結束時應恢復圖示');
+  assert.ok(app.includes("active.tile?.classList.remove('tile-effect-active','tile-effect-build')"),'動畫重播或中斷時應恢復圖示');
+  assert.ok(app.includes('for(const tileId of tileEffectTimers.keys())clearTileEffect(tileId)'),'棋盤重繪前應清理動畫');
+  assert.doesNotMatch(style,/\.tile-effect-active > \.tile-name\s*\{/,'格子名稱仍應保留');
+});

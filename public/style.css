@@ -511,3 +511,14 @@
 @media(prefers-reduced-motion:reduce){
   .board .tile .ambient-piece{animation:none!important;opacity:.45}
 }
+
+
+/* v1.6.6：格子動畫期間隱藏原圖，結束自動恢復。
+ * tile-effect-active 由 playTileEffect 加入，動畫完成、重新觸發或棋盤重繪時移除。
+ * 僅隱藏原格主圖與常駐裝飾；編號、名稱、價格、屋主標示與玩家棋子仍可見。
+ * 使用 visibility 避免留下重疊影像，並且不改動棋盤排版。
+ */
+.board .tile.tile-effect-active > .tile-icon,
+.board .tile.tile-effect-active > .tile-ambient{
+  visibility:hidden;
+}
