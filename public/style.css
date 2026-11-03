@@ -293,3 +293,28 @@
 .feedback-class{margin-top:18px;padding:16px;background:#f1f8fa;border-radius:15px}
 .feedback-class h4{margin:0 0 7px}
 @media(max-width:650px){.learning-feedback{padding:14px;border-radius:15px}.feedback-heading h3{font-size:19px}.feedback-skill-row{grid-template-columns:minmax(0,1fr) auto 48px;gap:6px;padding:11px 7px;font-size:11px}.feedback-weak-grid{grid-template-columns:1fr}}
+
+
+/* v1.5 等待室同步選單摘要、課後文字回饋 */
+.lobby-settings-preview{margin:18px 0 16px;padding:17px;border:1px solid #d7e6db;border-radius:16px;background:#f5fbf5}
+.settings-preview-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.settings-preview-head h3{margin:0;font-size:17px;color:#2d6657}
+.settings-preview-head span{font-size:12px;color:#638177}
+.settings-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:15px}
+.settings-summary-item{min-width:0;background:#fff;border:1px solid #dbe9df;border-radius:11px;padding:13px 10px;text-align:center;display:grid;gap:6px}
+.settings-summary-item span{font-size:12px;color:#72837b;font-weight:700}
+.settings-summary-item strong{font-size:18px;color:#214f4b;overflow-wrap:anywhere}
+.reflection-label{display:block;font-size:14px;font-weight:850;margin:17px 0 8px;color:#355a4f}
+#reflection-input{width:100%;min-height:145px;display:block;resize:vertical;background:#fff;border:2px solid #d4e2da;border-radius:13px;color:#263e38;padding:13px;font:inherit;font-size:15px;line-height:1.65}
+#reflection-input:focus-visible{outline:3px solid #79aa98;outline-offset:1px}
+.reflection-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:12px}
+.reflection-count{color:#688075;font-size:12px;font-weight:800}
+.reflection-count.over-limit{color:#bf4c43}
+.reflection-status{font-size:12px!important;color:#65796d!important;line-height:1.7!important;margin-top:10px!important}
+.teacher-reflections{max-width:660px;margin:26px auto;padding:20px;text-align:left;background:#f7f8ff;border:1px solid #dde1f3;border-radius:16px}
+.teacher-reflections h3{margin:0 0 10px;font-size:19px}
+.reflection-entry{background:var(--player-light);border:1px solid #e0e6ed;border-left:5px solid var(--player-color);padding:11px 14px;margin:10px 0;border-radius:11px}
+.reflection-entry-head{display:flex;align-items:center;gap:8px;font-size:14px}.reflection-entry-head span:last-child{margin-left:auto;font-size:11px;color:#567066}
+.reflection-entry p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.75;margin:8px 0 0;color:#2a3e42}
+@media(max-width:750px){.settings-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.settings-summary-item strong{font-size:16px}}
+@media(max-width:420px){.settings-summary-grid{gap:7px}.settings-summary-item{padding:10px 6px}.lobby-settings-preview{padding:12px}}

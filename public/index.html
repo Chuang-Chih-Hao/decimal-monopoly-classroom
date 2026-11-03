@@ -55,7 +55,8 @@
         <div class="setting-grid"><label>遊戲輪數<select id="round-select"><option value="2">2 輪｜短場</option><option value="3">3 輪｜短場</option><option value="4">4 輪</option><option value="5">5 輪</option><option value="6">6 輪</option><option value="8">8 輪</option><option value="10">10 輪</option><option value="12">12 輪｜固定輪數</option><option value="unlimited" selected>♾️ 無限輪｜依時間結束（推薦）</option></select></label><label>每人起始金額<select id="money-select"><option value="600">$600｜挑戰</option><option value="900" selected>$900｜標準</option><option value="1200">$1200｜寬裕</option></select></label><label>每題作答時間<select id="question-time-select"><option value="90">90 秒</option><option value="120" selected>120 秒｜推薦</option><option value="150">150 秒</option><option value="180">180 秒｜需要更多時間</option></select></label><label>課堂遊玩時間<select id="duration-select"><option value="20">20 分鐘｜短場</option><option value="30" selected>30 分鐘｜推薦</option><option value="40">40 分鐘｜長場</option></select></label></div><p class="settings-note">♾️ 選「無限輪」就不會因輪數用完而提前結束，仍會在 20／30／40 分鐘的時間上限到達後結算，房主也能手動結束。預設每題 2 分鐘；當前題目或對戰可以完成後再結算。</p>
         <button id="start-btn" class="btn primary host-start">🚀 所有人就位，開始遊戲！</button>
       </div>
-      <div id="guest-waiting" class="guest-waiting" hidden>⏳ 等待房主開始遊戲…</div>
+      <section class="lobby-settings-preview" aria-label="房主本局設定"><div class="settings-preview-head"><h3>📋 本局遊戲設定</h3><span id="settings-sync-label">房主選擇後會同步更新</span></div><div id="lobby-settings-summary" class="settings-summary-grid" aria-live="polite"></div></section>
+      <div id="guest-waiting" class="guest-waiting" hidden>⏳ 已加入房間，請確認上面的四項設定，等待房主開始遊戲…</div>
       <button id="leave-btn" class="link-btn">離開此房間</button>
     </section>
 
@@ -79,7 +80,7 @@
 
     <section id="end-screen" class="end-screen panel" hidden>
       <div class="overline">MISSION COMPLETED</div><div class="end-icon">🏆</div><h2>小數富翁，正式結算！</h2><p>用現金＋房產原價計算總資產，答題數據也一起公開。</p><div id="end-rankings" class="end-rankings"></div><section id="learning-feedback" class="learning-feedback" aria-label="我的錯題和常錯題型分析"></section>
-      <div class="reflection"><h3>🧠 數學冒險家回饋</h3><p>① 哪一題最有挑戰？你怎麼算出來的？<br/>② 比價和打折時，哪個方法最實用？<br/>③ 下次買房或繳租，你會改變什麼策略？</p></div>
+      <section class="reflection" aria-label="數學冒險家文字回饋"><h3>🧠 數學冒險家回饋</h3><p>① 哪一題最有挑戰？你怎麼算出來的？<br/>② 比價和打折時，哪個方法最實用？<br/>③ 下次買房或繳租，你會改變什麼策略？</p><label class="reflection-label" for="reflection-input">✍️ 寫下這次的學習心得</label><textarea id="reflection-input" maxlength="600" rows="5" placeholder="例如：我最難的是折扣題，原來 7.5 折要先乘 0.75。下次我會先估算再計算。"></textarea><div class="reflection-actions"><span id="reflection-count" class="reflection-count">0 / 600 字</span><button type="button" id="reflection-save" class="btn primary">📩 送出給房主</button></div><p id="reflection-status" class="reflection-status" role="status">只有你和房主能看到這份文字回饋；送出後仍可修改。</p></section><section id="teacher-reflections" class="teacher-reflections" hidden><h3>👑 房主：學生文字回饋總覽</h3><div id="reflection-list"></div></section>
       <button id="restart-btn" class="btn primary" hidden>🔄 原班人馬，再玩一局</button>
     </section>
   </main>

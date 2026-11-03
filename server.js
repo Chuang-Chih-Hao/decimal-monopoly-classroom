@@ -71,6 +71,9 @@ io.on('connection',(socket)=>{
     const {room,player}=games.findSession(code,token);
     return attach(room,player);
   }));
+  socket.on('updateSettings',action((patch)=>{
+    const {room,playerId}=identity();games.updateSettings(room,playerId,patch);broadcast(room);
+  }));
   socket.on('start',action((settings)=>{
     const {room,playerId}=identity();games.start(room,playerId,settings);broadcast(room);
   }));
@@ -94,6 +97,9 @@ io.on('connection',(socket)=>{
   }));
   socket.on('finish',action(()=>{
     const {room,playerId}=identity();games.finishByHost(room,playerId);broadcast(room);
+  }));
+  socket.on('saveReflection',action(({text})=>{
+    const {room,playerId}=identity();games.saveReflection(room,playerId,text);broadcast(room);
   }));
   socket.on('reset',action(()=>{
     const {room,playerId}=identity();games.reset(room,playerId);broadcast(room);

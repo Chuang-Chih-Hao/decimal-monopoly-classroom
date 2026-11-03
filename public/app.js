@@ -27,6 +27,7 @@
   let animationNonce=0;
   let deferredFeedback=null;
   let seenDuelResultId=null;
+  let reflectionDirty=false;
   const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
   const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   let tokenData=null;
@@ -43,7 +44,7 @@
   }
   function clearSession(){
     animationNonce++;activeRollAnimation=null;deferredFeedback=null;
-    seenRollId=null;seenLogId=null;seenDuelResultId=null;mapFocusKey=null;mapZoom=1;
+    seenRollId=null;seenLogId=null;seenDuelResultId=null;mapFocusKey=null;mapZoom=1;reflectionDirty=false;
     $('event-spotlight').hidden=true;
     tokenData=null;me=null;state=null;
     try{localStorage.removeItem('decimal-monopoly-session');}catch{}
@@ -52,7 +53,7 @@
   // 首次加入／重新連線時，以伺服器畫面為準，不重播已經結束的擲骰。
   function setInitialState(next){
     animationNonce++;activeRollAnimation=null;deferredFeedback=null;
-    state=next;mapFocusKey=null;
+    state=next;mapFocusKey=null;reflectionDirty=false;
     seenRollId=next.lastRoll?.id??null;
     seenDuelResultId=next.lastDuel?.id??null;
     seenLogId=next.log?.[0]?.id??null;
@@ -109,7 +110,7 @@
   function request(event,payload={},done){
     if(!socket.connected){showToast('尚未連線，請檢查網路。',true);return;}
     socket.timeout(10000).emit(event,payload,(err,response)=>{
-      if(err){showToast('網路連線逾時，請再試一次。',true);return;}
+      if(err){showToast('網路連線逾時，請再試一次。',true);if(done)done(false);return;}
       if(!response?.ok){showToast(response?.error||'操作失敗。',true);if(done)done(false);return;}
       if(done)done(true,response);
     });
@@ -199,7 +200,27 @@
     if(!window.confirm('確定離開這個房間？房主離開會關閉等待中的房間。'))return;
     request('leave',{},(ok)=>{if(ok)clearSession();});
   });
-  $('start-btn').addEventListener('click',()=>request('start',{rounds:$('round-select').value==='unlimited'?'unlimited':Number($('round-select').value),money:Number($('money-select').value),questionSeconds:Number($('question-time-select').value),durationMinutes:Number($('duration-select').value)}));
+  const settingsFromForm=()=>({rounds:$('round-select').value==='unlimited'?'unlimited':Number($('round-select').value),money:Number($('money-select').value),questionSeconds:Number($('question-time-select').value),durationMinutes:Number($('duration-select').value)});
+  for(const id of ['round-select','money-select','question-time-select','duration-select']){
+    $(id).addEventListener('change',()=>{if(isHost()&&state?.status==='lobby')request('updateSettings',settingsFromForm());});
+  }
+  $('start-btn').addEventListener('click',()=>request('start',settingsFromForm()));
+  $('reflection-input').addEventListener('input',()=>{reflectionDirty=true;updateReflectionUI();});
+  $('reflection-save').addEventListener('click',()=>{
+    const text=$('reflection-input').value.trim();
+    if(!text){showToast('請先寫下至少一句學習心得。',true);return;}
+    if([...text].length>600){showToast('心得最多 600 字，請精簡後再送出。',true);return;}
+    const btn=$('reflection-save');btn.disabled=true;
+    request('saveReflection',{text},(ok)=>{
+      btn.disabled=false;
+      if(ok){
+        // 送出期間若又繼續輸入，仍視為尚未送出的新草稿，避免悄悄覆蓋。
+        reflectionDirty=$('reflection-input').value.trim()!==text;
+        showToast('學習回饋已儲存，房主可以看到！');
+      }
+      updateReflectionUI();
+    });
+  });
   $('skip-btn').addEventListener('click',()=>{
     if(window.confirm('即將跳過目前題目或雙人加賽，並進入下一人。對戰跳過時不收額外零用錢，確定嗎？'))request('skip');
   });
@@ -223,6 +244,7 @@
   socket.on('state',next=>{
     if(!me)return;
     const previous=state;
+    if(previous?.status==='finished'&&next.status==='lobby'){reflectionDirty=false;$('reflection-input').value='';}
     // 若房主在上一位角色移動動畫未播完就跳回合，立即停止舊動畫，避免鏡頭與新回合爭奪焦點。
     if(previous?.currentPlayerId!==next.currentPlayerId&&activeRollAnimation){
       animationNonce++;activeRollAnimation=null;deferredFeedback=null;
@@ -277,6 +299,20 @@
     }
     $('host-settings').hidden=!isHost();$('guest-waiting').hidden=isHost();
     $('start-btn').disabled=state.players.length<2;
+    const setting=state.settings||{rounds:'unlimited',money:900,questionSeconds:120,durationMinutes:30};
+    const cards=[
+      ['🎲 遊戲輪數',setting.rounds==='unlimited'?'♾️ 無限輪':`${setting.rounds} 輪`],
+      ['💰 每人起始金額',money(setting.money)],
+      ['⏳ 每題作答時間',`${setting.questionSeconds} 秒`],
+      ['🕒 課堂遊玩時間',`${setting.durationMinutes} 分鐘`]
+    ];
+    $('lobby-settings-summary').innerHTML=cards.map(([label,value])=>`<div class="settings-summary-item"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`).join('');
+    $('settings-sync-label').textContent=isHost()?'修改選單後，全員立即看到':'由房主設定・即時同步';
+    if(isHost()){
+      for(const [id,key] of [['round-select','rounds'],['money-select','money'],['question-time-select','questionSeconds'],['duration-select','durationMinutes']]){
+        if(document.activeElement!==$(id))$(id).value=String(setting[key]);
+      }
+    }
   }
   // 30 格固定為 10 × 7 的傳統大富翁方格外圈；不變更伺服器的格子編號。
   function renderBoard(){
@@ -475,7 +511,7 @@
     const remaining=Math.max(0,Math.ceil((state.endsAt-Date.now())/1000));
     const minutes=Math.floor(remaining/60),seconds=remaining%60;
     const level=state.bonusStage;
-    timer.textContent=`⏱️ ${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')} ${level===2?'🚀 最終衝刺 +$60':level===1?'✨ 中場加碼 +$30':`｜${state.durationMinutes} 分鐘挑戰`}`;
+    timer.textContent=`⏱️ ${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')} ${level===2?'🚀 最終衝刺 +$30':level===1?'✨ 中場加碼 +$15':`｜${state.durationMinutes} 分鐘挑戰`}`;
     timer.classList.toggle('ending',remaining<=180);
   }
   function renderQuestion(){
@@ -572,9 +608,34 @@
       <div class="feedback-privacy">🔒 這份個人錯題和解析只有你自己能看到；全班共通題型統計不會顯示個人姓名。</div>
       <div class="feedback-class"><h4>🏫 全班共同需要練習的題型</h4><p class="feedback-note">依答錯次數排序，僅供教師規劃下次複習；不同題型的作答次數可能不同。</p>${classRows}</div>`;
   }
+  function updateReflectionUI(){
+    const area=$('reflection-input');
+    const len=[...area.value].length;
+    $('reflection-count').textContent=`${len} / 600 字`;
+    $('reflection-count').classList.toggle('over-limit',len>600);
+    $('reflection-save').disabled=len===0||len>600;
+    const saved=state?.myReflection;
+    $('reflection-status').textContent=reflectionDirty
+      ? '📝 內容已修改，尚未送出。送出後只有你和房主能閱讀。'
+      : saved?`✅ 已送出回饋；可以修改後再次送出。`:'🔒 尚未送出。只有你與房主能閱讀你的文字回饋。';
+  }
+  function renderWrittenReflection(){
+    const saved=state.myReflection;
+    const area=$('reflection-input');
+    if(!reflectionDirty&&area.value!==(saved?.text||''))area.value=saved?.text||'';
+    updateReflectionUI();
+    const section=$('teacher-reflections');section.hidden=!isHost();
+    if(!isHost()){$('reflection-list').replaceChildren();return;}
+    const entries=state.hostReflections||[];
+    const completed=entries.filter(item=>item.reflection).length;
+    $('reflection-list').innerHTML=`<p class="reflection-status">已收到 ${completed} / ${entries.length} 位玩家的回饋（房主也可填寫）。</p>`+entries.map(item=>
+      `<article class="reflection-entry" style="${colorStyle(item)}"><div class="reflection-entry-head">${animalHtml(item.animal)} <strong>${esc(item.name)}${item.id===me?'（我）':''}</strong> <span>${item.reflection?'✅ 已填寫':'⏳ 尚未填寫'}</span></div>${item.reflection?`<p>${esc(item.reflection.text)}</p>`:''}</article>`
+    ).join('');
+  }
   function renderEnd(){
     $('end-rankings').innerHTML=state.rankings.map((r,i)=>`<div class="end-row" style="${colorStyle(r)}"><strong>${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</strong><span class="avatar">${animalHtml(r.animal)}</span><div><strong><span class="person-color-dot"></span>${esc(r.name)}（${colorFor(r).name}）</strong><div class="end-stats">現金 ${money(r.cash)} ＋ 房產 ${money(r.landValue)} · 答對 ${r.correct}/${r.attempted}</div></div><div class="end-amount">${money(r.score)}</div></div>`).join('');
     renderLearningFeedback();
+    renderWrittenReflection();
     $('restart-btn').hidden=!isHost();
   }
 })();

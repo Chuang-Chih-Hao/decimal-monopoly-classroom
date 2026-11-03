@@ -56,3 +56,24 @@ test('前端開房選項支援無限輪，結算包含個人錯題與匿名全�
   assert.ok(app.includes('state.personalFeedback'));
   assert.ok(app.includes('state.classFeedback'));
 });
+
+
+test('等待室顯示四種設定，同步訊息由後端提供且只有房主能編輯',()=>{
+  for(const id of ['lobby-settings-summary','settings-sync-label','round-select','money-select','question-time-select','duration-select'])assert.ok(index.includes(`id="${id}"`),id);
+  assert.ok(app.includes("request('updateSettings',settingsFromForm())"));
+  assert.ok(app.includes('const setting=state.settings'));
+  assert.ok(app.includes("'🎲 遊戲輪數'"));
+  assert.ok(app.includes("'💰 每人起始金額'"));
+  assert.ok(app.includes("'⏳ 每題作答時間'"));
+  assert.ok(app.includes("'🕒 課堂遊玩時間'"));
+});
+
+test('文字反思可以輸入、送出、重新編輯，房主看到全員回饋列表',()=>{
+  for(const id of ['reflection-input','reflection-save','reflection-count','reflection-status','teacher-reflections','reflection-list'])assert.ok(index.includes(`id="${id}"`),id);
+  assert.ok(index.includes('textarea'));
+  assert.ok(app.includes("request('saveReflection',{text}"));
+  assert.ok(app.includes('state.myReflection'));
+  assert.ok(app.includes('state.hostReflections'));
+  assert.ok(app.includes('reflectionDirty'));
+  assert.ok(app.includes('esc(item.reflection.text)'));
+});

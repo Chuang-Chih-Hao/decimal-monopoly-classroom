@@ -1,6 +1,6 @@
 {
   "name": "decimal-monopoly-classroom",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "國小六年級｜小數大富翁：最多 5 位學生 + 1 位房主的即時連線數學遊戲",
   "type": "commonjs",
   "main": "server.js",

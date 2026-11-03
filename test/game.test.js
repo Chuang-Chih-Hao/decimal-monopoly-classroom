@@ -98,7 +98,7 @@ test('租金不足先作救援題，答對有補助，答錯暫停下一輪',()=
   }
 });
 
-test('Boss 有 2 道題，兩題對加 $250、只有一題對加 $90',()=>{
+test('Boss 有 2 道題，兩題對加 $140、只有一題對加 $45',()=>{
   const {game,room,host}=setup();
   host.position=20;
   forceDie(game,room,host.id,1);
@@ -106,7 +106,7 @@ test('Boss 有 2 道題，兩題對加 $250、只有一題對加 $90',()=>{
   game.answer(room,host.id,chooseCorrect(room));
   assert.equal(room.pending.stage,2);
   game.answer(room,host.id,chooseWrong(room));
-  assert.equal(host.cash,990);assert.equal(room.phase,'between');
+  assert.equal(host.cash,945);assert.equal(room.phase,'between');
   assert.equal(host.attempted,2);assert.equal(host.correct,1);
 });
 
@@ -301,13 +301,13 @@ test('30 分鐘到期後由伺服器自動結算；進行中的答題不會被�
   assert.equal(room.status,'finished');
 });
 
-test('後段加碼會更新獎勵，答對數學題獲得額外 $60',()=>{
+test('後段加碼會更新獎勵，答對數學題額外獲得 $30',()=>{
   const {game,room,host}=setup();
   room.endsAt=Date.now()+9*60*1000; // 從 30 分鐘原始期限倒推，已遊玩 21 分鐘
   game.tick(()=>{});
   assert.equal(room.bonusStage,2);
   game.ask(room,'calc');game.answer(room,host.id,chooseCorrect(room));
-  assert.equal(host.cash,900+85+60);
+  assert.equal(host.cash,900+45+30);
 });
 
 test('小遊戲由房主略過時不進行額外轉帳',()=>{
@@ -431,4 +431,73 @@ test('未答題者有空白學習報告，不以空樣本判定弱項',()=>{
   assert.deepEqual(blank.weakSkills,[]);
   assert.deepEqual(blank.examples,[]);
   assert.equal(summarizeClass([{answerHistory:[]}]).attempted,0);
+});
+
+
+test('等待室四項設定有預設值、房主改選單後所有玩家看到同一版本',()=>{
+  const game=new GameManager();
+  const {room,player:host}=game.newRoom('主持人','capybara');
+  const {player:guest}=game.join(room.code,'玩家','🐈');
+  const initial=game.publicState(room,guest.id).settings;
+  assert.deepEqual(initial,{rounds:'unlimited',money:900,questionSeconds:120,durationMinutes:30});
+  assert.throws(()=>game.updateSettings(room,guest.id,{money:1200}),GameError);
+  game.updateSettings(room,host.id,{rounds:8,money:600,questionSeconds:180,durationMinutes:40});
+  assert.deepEqual(game.publicState(room,host.id).settings,game.publicState(room,guest.id).settings);
+  assert.deepEqual(game.publicState(room,guest.id).settings,{rounds:8,money:600,questionSeconds:180,durationMinutes:40});
+  assert.throws(()=>game.updateSettings(room,host.id,{money:999}),GameError);
+  assert.throws(()=>game.updateSettings(room,host.id,{admin:true}),GameError);
+  assert.equal(game.publicState(room,guest.id).settings.money,600);
+  game.start(room,host.id);
+  assert.equal(room.roundLimit,8);
+  assert.equal(guest.cash,600);
+  assert.equal(room.questionSeconds,180);
+  assert.equal(room.durationMinutes,40);
+  assert.throws(()=>game.updateSettings(room,host.id,{money:1200}),GameError);
+});
+
+test('同局結束後學生可提交並修改文字回饋，房主可查看，其他學生不可看',()=>{
+  const game=new GameManager();
+  const {room,player:host}=game.newRoom('老師','capybara');
+  const {player:first}=game.join(room.code,'小安','🐈');
+  const {player:second}=game.join(room.code,'小琪','🐕');
+  assert.throws(()=>game.saveReflection(room,first.id,'還沒開局'),GameError);
+  game.start(room,host.id);
+  assert.throws(()=>game.saveReflection(room,first.id,'遊戲進行中'),GameError);
+  game.finishByHost(room,host.id);
+  const firstText='我學到了 7.5 折是原價乘以 0.75。';
+  game.saveReflection(room,first.id,firstText);
+  assert.equal(game.publicState(room,first.id).myReflection.text,firstText);
+  assert.equal(game.publicState(room,first.id).hostReflections,null);
+  assert.equal(game.publicState(room,second.id).myReflection,null);
+  assert.equal(game.publicState(room,second.id).hostReflections,null);
+  assert.ok(!JSON.stringify(game.publicState(room,second.id)).includes(firstText));
+  const all=game.publicState(room,host.id).hostReflections;
+  assert.equal(all.length,3);
+  assert.equal(all.find(p=>p.id===first.id).reflection.text,firstText);
+  assert.equal(all.find(p=>p.id===second.id).reflection,null);
+  game.saveReflection(room,first.id,'我下次會先估算答案。');
+  assert.equal(game.publicState(room,host.id).hostReflections.find(p=>p.id===first.id).reflection.text,'我下次會先估算答案。');
+  assert.throws(()=>game.saveReflection(room,first.id,'  '),GameError);
+  assert.throws(()=>game.saveReflection(room,first.id,'字'.repeat(601)),GameError);
+  assert.throws(()=>game.saveReflection(room,first.id,'危險\u0000字'),GameError);
+  assert.throws(()=>game.saveReflection(room,'fake-id','內容'),GameError);
+  assert.equal(game.publicState(room,first.id).myReflection.text,'我下次會先估算答案。');
+  game.reset(room,host.id);
+  assert.equal(first.reflection,null);
+  assert.equal(game.publicState(room,first.id).myReflection,null);
+  assert.deepEqual(game.publicState(room,second.id).settings,{rounds:'unlimited',money:900,questionSeconds:120,durationMinutes:30});
+});
+
+test('調整金錢平衡：普通題、寶箱與 Boss 頒發較少獎金，基礎購地規則不變',()=>{
+  const {game,room,host}=setup();
+  game.ask(room,'calc');game.answer(room,host.id,chooseCorrect(room));
+  assert.equal(host.cash,945); // 普通數學題從 85 降到 45
+  game.ask(room,'compare');game.answer(room,host.id,chooseCorrect(room));
+  assert.equal(host.cash,1010); // 比價題從 130 降到 65
+  game.ask(room,'chest');game.answer(room,host.id,chooseCorrect(room));
+  assert.equal(host.cash,1100); // 寶箱從 180 降到 90
+  room.bonusStage=1;game.ask(room,'discount');game.answer(room,host.id,chooseCorrect(room));
+  assert.equal(host.cash,1165); // 折扣題 50 + 中場 15
+  room.bonusStage=2;game.ask(room,'discount');game.answer(room,host.id,chooseCorrect(room));
+  assert.equal(host.cash,1245); // 折扣題 50 + 最後 30
 });
