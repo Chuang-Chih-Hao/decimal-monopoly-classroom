@@ -6,11 +6,11 @@
   <meta name="theme-color" content="#f6efe5" />
   <meta name="description" content="六年級小數大富翁：5 位學生與房主同時連線，邊玩邊練習小數、折扣、比價與應用題。" />
   <title>小數富翁探險島｜六年級數學連線大富翁</title>
-  <link rel="stylesheet" href="/style.css?v=1.7.3" />
+  <link rel="stylesheet" href="/style.css?v=1.7.4" />
   <script src="/socket.io/socket.io.js" defer></script>
-  <script src="/board-layout.js?v=1.7.3" defer></script>
-  <script src="/player-colors.js?v=1.7.3" defer></script>
-  <script src="/app.js?v=1.7.3" defer></script>
+  <script src="/board-layout.js?v=1.7.4" defer></script>
+  <script src="/player-colors.js?v=1.7.4" defer></script>
+  <script src="/app.js?v=1.7.4" defer></script>
 </head>
 <body>
 <div class="app">
@@ -50,7 +50,7 @@
 
     <div id="update-banner" class="update-banner" hidden><span id="update-banner-info">遊戲有新版可用。</span><button id="update-now" class="btn outline small" type="button">🔄 重新整理以更新</button></div>
     <section id="lobby-screen" class="lobby-screen panel" hidden>
-      <div class="lobby-head"><div><span class="overline">等大家到齊！</span><h2>冒險家集合！</h2><p>把房間代碼分享給同學，每人選一隻自己的動物。</p></div><div class="lobby-code" id="lobby-big-code">------</div></div>
+      <div class="lobby-head"><div><span class="overline">等大家到齊！</span><h2>冒險家集合！</h2><p>把房間代碼分享給同學，每人選一隻自己的動物。</p></div><div class="lobby-header-actions"><div class="lobby-code" id="lobby-big-code">------</div><button id="leave-btn" type="button" class="btn lobby-leave-btn">🚪 離開此房間</button></div></div>
       <div id="lobby-slots" class="lobby-slots"></div>
       <section class="lobby-settings-preview" aria-label="房主本局設定"><div class="settings-preview-head"><h3>📋 本局遊戲設定</h3><span id="settings-sync-label">房主選擇後會同步更新</span></div><div id="lobby-settings-summary" class="settings-summary-grid" aria-live="polite"></div></section>
       <div id="host-settings" class="host-settings" hidden>
@@ -58,7 +58,6 @@
         <button id="start-btn" class="btn primary host-start">🚀 所有人就位，開始遊戲！</button>
       </div>
       <div id="guest-waiting" class="guest-waiting" hidden>⏳ 房主設定已顯示在上方；請確認後等待開始遊戲…</div>
-      <button id="leave-btn" class="link-btn">離開此房間</button>
     </section>
 
     <section id="playing-screen" hidden>

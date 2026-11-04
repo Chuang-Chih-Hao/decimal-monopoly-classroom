@@ -350,3 +350,31 @@ test('v1.7.3 購地結束或中斷會恢復原圖，原有其他到格特效繼�
   assert.match(style,/@keyframes tile-build-rise/);
   assert.match(style,/@media\(prefers-reduced-motion:reduce\)[\s\S]*?\.tile-effect-house\{animation:none!important\}/);
 });
+
+// v1.7.4：等待室離開按鈕應醒目、固定在房號旁而非頁尾，且只出現一次。
+test('v1.7.4 等待室離開按鈕位於標頭房間代碼旁，且只有一個可操作的離房按鈕',()=>{
+  const start=index.indexOf('<section id="lobby-screen"');
+  const end=index.indexOf('<section id="playing-screen"',start);
+  assert.ok(start>=0&&end>start);
+  const lobby=index.slice(start,end);
+  assert.equal((lobby.match(/id="leave-btn"/g)||[]).length,1);
+  const headerEnd=lobby.indexOf('<div id="lobby-slots"');
+  assert.ok(headerEnd>0);
+  const header=lobby.slice(0,headerEnd);
+  assert.ok(header.includes('class="lobby-header-actions"'));
+  assert.ok(header.includes('id="lobby-big-code"'));
+  assert.ok(header.includes('id="leave-btn"'));
+  assert.ok(header.indexOf('id="lobby-big-code"')<header.indexOf('id="leave-btn"'));
+  assert.match(header,/<button id="leave-btn" type="button" class="btn lobby-leave-btn">🚪 離開此房間<\/button>/);
+  assert.ok(app.includes("$('leave-btn').addEventListener('click'"));
+  assert.ok(app.includes("window.confirm('確定離開這個房間？房主離開會關閉等待中的房間。')"));
+});
+
+test('v1.7.4 離開房間按鈕具對比、足夠觸控高度與手機全寬布局',()=>{
+  const style=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
+  assert.match(style,/\.lobby-header-actions\{display:flex;flex:none;flex-direction:column;align-items:flex-end;gap:10px\}/);
+  assert.match(style,/\.lobby-leave-btn\s*\{[^}]*min-height:46px;min-width:176px;[^}]*border:2px solid #[0-9a-f]{6};[^}]*background:#[0-9a-f]{6};color:#[0-9a-f]{6};/);
+  assert.match(style,/@media\(max-width:640px\)\{[^}]*\.lobby-header-actions\{width:100%;[^}]*\}/);
+  assert.match(style,/\.lobby-leave-btn\{width:100%;min-height:48px\}/);
+  assert.match(style,/\.lobby-leave-btn:focus-visible\{outline:/);
+});

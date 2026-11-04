@@ -597,3 +597,19 @@
   .side-column > .question-panel,
   .side-column > .result-panel{grid-column:1/-1}
 }
+
+/* v1.7.4：等待室離開按鈕移到房號旁，改為醒目的次要操作；
+   不影響房主「開始遊戲」主按鈕。 */
+.lobby-header-actions{display:flex;flex:none;flex-direction:column;align-items:flex-end;gap:10px}
+.lobby-leave-btn{
+  min-height:46px;min-width:176px;padding:11px 18px;
+  border:2px solid #d97369;border-radius:12px;background:#fff1ee;color:#a93d38;
+  box-shadow:0 3px 0 #f4c5bd;font-size:14px;font-weight:900;line-height:1.4;
+}
+.lobby-leave-btn:not(:disabled):hover{background:#ffe3dd;border-color:#bf5a50;filter:none}
+.lobby-leave-btn:focus-visible{outline:3px solid #e59481;outline-offset:3px}
+@media(max-width:640px){
+  .lobby-header-actions{width:100%;margin-top:14px;align-items:stretch;gap:10px}
+  .lobby-header-actions .lobby-code{display:block;width:100%;text-align:center}
+  .lobby-leave-btn{width:100%;min-height:48px}
+}
