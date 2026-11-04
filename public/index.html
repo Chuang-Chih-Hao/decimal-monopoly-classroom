@@ -6,17 +6,27 @@
   <meta name="theme-color" content="#f6efe5" />
   <meta name="description" content="六年級小數大富翁：5 位學生與房主同時連線，邊玩邊練習小數、折扣、比價與應用題。" />
   <title>小數富翁探險島｜六年級數學連線大富翁</title>
-  <link rel="stylesheet" href="/style.css?v=1.8.0" />
+  <link rel="stylesheet" href="/style.css?v=1.8.1" />
   <script src="/socket.io/socket.io.js" defer></script>
-  <script src="/board-layout.js?v=1.8.0" defer></script>
-  <script src="/player-colors.js?v=1.8.0" defer></script>
-  <script src="/app.js?v=1.8.0" defer></script>
+  <script src="/board-layout.js?v=1.8.1" defer></script>
+  <script src="/player-colors.js?v=1.8.1" defer></script>
+  <script src="/sound.js?v=1.8.1" defer></script>
+  <script src="/app.js?v=1.8.1" defer></script>
 </head>
 <body>
 <div class="app">
   <header class="app-header">
     <div class="brand"><span class="brand-logo">🎲</span><div><strong>小數富翁<span class="brand-accent">探險島</span></strong><small>六年級｜小數應用 × 多人挑戰</small></div></div>
-    <div id="connection" class="connection"><span class="status-dot"></span>連線中…</div>
+    <div class="header-utilities">
+      <div class="sound-controls" role="group" aria-label="遊戲音效控制">
+        <button id="sound-toggle" type="button" class="sound-toggle" aria-pressed="true" title="切換遊戲音效">🔉 音效開啟</button>
+        <label class="sound-volume-label" for="sound-volume">音量
+          <input type="range" id="sound-volume" min="0" max="60" step="1" value="18" aria-label="遊戲音效音量" />
+        </label>
+        <button id="sound-preview" type="button" class="sound-preview" title="試聽目前音量" aria-label="試聽音效">♫</button>
+      </div>
+      <div id="connection" class="connection"><span class="status-dot"></span>連線中…</div>
+    </div>
   </header>
 
   <section id="entry-screen" class="entry-screen">

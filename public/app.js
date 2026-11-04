@@ -1,8 +1,47 @@
 /* 小數富翁前端：所有資產、擲骰、判分都以伺服器狀態為準。 */
 (() => {
   'use strict';
-  const CLIENT_VERSION='1.8.0';
+  const CLIENT_VERSION='1.8.1';
   const socket=io({transports:['websocket','polling'],reconnection:true});
+  const sound=window.DecimalMonopolyAudio;
+  const playSound=(kind,detail)=>sound?.play(kind,detail);
+  function initSoundControls(){
+    const toggle=document.getElementById('sound-toggle');
+    const slider=document.getElementById('sound-volume');
+    const preview=document.getElementById('sound-preview');
+    if(!toggle||!slider||!preview)return;
+    if(!sound?.getSettings().supported){
+      toggle.textContent='🔇 不支援音效';toggle.disabled=true;
+      slider.disabled=true;preview.disabled=true;
+      return;
+    }
+    const paint=()=>{
+      const {enabled,volume}=sound.getSettings();
+      toggle.textContent=enabled?'🔉 音效開啟':'🔇 已靜音';
+      toggle.setAttribute('aria-pressed',String(enabled));
+      toggle.title=enabled?'點擊關閉遊戲音效':'點擊開啟遊戲音效';
+      slider.value=String(Math.round(volume*100));
+      slider.disabled=!enabled;
+      preview.disabled=!enabled||volume===0;
+      slider.title='音量 '+Math.round(volume*100)+'%';
+      slider.setAttribute('aria-valuetext',Math.round(volume*100)+'%');
+    };
+    toggle.addEventListener('click',async()=>{
+      const enabled=sound.setEnabled(!sound.getSettings().enabled);
+      paint();
+      if(enabled){await sound.unlock();sound.play('preview');}
+    });
+    slider.addEventListener('input',()=>{sound.setVolume(Number(slider.value)/100);paint();});
+    slider.addEventListener('change',async()=>{await sound.unlock();sound.play('preview');});
+    preview.addEventListener('click',async()=>{await sound.unlock();sound.play('preview');});
+    // 瀏覽器在使用者首次點擊／按鍵前不允許自動播放聲音。
+    // 只在真實互動後解鎖 AudioContext，避免 Socket.IO 廣播觸發未授權播放。
+    const unlockOnce=()=>{if(sound.getSettings().enabled&&!sound.getSettings().ready)void sound.unlock();};
+    document.addEventListener('pointerdown',unlockOnce,{passive:true});
+    document.addEventListener('keydown',unlockOnce);
+    paint();
+  }
+  initSoundControls();
   const $=id=>document.getElementById(id);
   const esc=(value)=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const money=n=>`$${Number(n||0).toLocaleString('zh-TW')}`;
@@ -58,6 +97,24 @@
   let tokenData=null;
   try {tokenData=JSON.parse(localStorage.getItem('decimal-monopoly-session')||'null');}catch{tokenData=null;}
 
+  function playStateSounds(previous,next){
+    // 首次加入／重新連線不重播舊答案、勝負、成就或結算。
+    if(!previous)return;
+    if(previous.status==='playing'&&next.status==='finished'){
+      playSound('finish');
+      return;
+    }
+    if(next.status!=='playing')return;
+    if(next.duel?.id&&next.duel.id!==previous.duel?.id)playSound('duel-start');
+    if(next.lastDuel?.id&&next.lastDuel.id!==previous.lastDuel?.id)playSound('duel-end');
+    if(next.lastResult?.at&&next.lastResult.at!==previous.lastResult?.at){
+      playSound(next.lastResult.correct?'correct':'wrong');
+    }
+    if(next.lastAchievement?.id&&next.lastAchievement.id!==previous.lastAchievement?.id
+      &&next.lastAchievement.playerId===me){
+      setTimeout(()=>{if(state?.status==='playing')playSound('achievement');},550);
+    }
+  }
   function showToast(text,error=false){
     const el=$('toast');el.textContent=text;el.classList.toggle('error',error);el.hidden=false;
     clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.hidden=true,4300);
@@ -201,6 +258,7 @@
     overlay.className=`tile-effect-overlay ${spec.className||'fx-pop'} mode-${mode}`;
     overlay.setAttribute('aria-hidden','true');
     if(mode==='build'){
+      playSound('purchase');
       // 購地成功時只繪製一棟房子；不加入徽章、色塊或第二個店面圖示。
       // 狀態類別與圖示類別不得重名，以免 CSS 100% 尺寸套到整個棋盤格。
       overlay.innerHTML='<span class="tile-effect-house" aria-hidden="true">🏠</span>';
@@ -221,6 +279,7 @@
   function playLandingTileEffect(tileId){
     const tile=state?.board?.[tileId];
     if(!tile)return;
+    playSound('landing',{type:tile.type,tileId:tile.id});
     playTileEffect(tileId,'landing',landingEffectSpec(tile));
   }
   function playPropertyBuildEffect(tileId,ownerId){
@@ -397,6 +456,7 @@
     }
     state=next;
     render();
+    playStateSounds(previous,next);
     if(next.lastAchievement?.id && next.lastAchievement.id!==seenAchievementId){
       seenAchievementId=next.lastAchievement.id;
       const badge=next.achievementCatalog?.find(a=>a.id===next.lastAchievement.achievementId);
@@ -534,6 +594,7 @@
     const current=activeRollAnimation;
     if(!current||current.id!==roll.id)return;
     current.started=true;
+    playSound('dice-roll');
     const board=$('board');
     const center=board.querySelector('.board-center');
     if(!center)return;
@@ -553,6 +614,7 @@
     dice.textContent=diceIcons[roll.die];
     dice.setAttribute('aria-label',`${roll.die} 點`);
     stage.classList.add('dice-show-result');
+    playSound('dice-result');
     stage.querySelector('.dice-stage-label').textContent=`🎲 ${playerName} 擲出`;
     stage.querySelector('.dice-stage-count').textContent=`${roll.die} 點！`;
     await sleep(reducedMotion?330:650);
@@ -590,6 +652,7 @@
     for(let step=1;step<=roll.die;step++){
       if(!valid())return;
       locate((roll.from+step)%state.board.length);
+      playSound('hop');
       // 每格重播單次跳躍；例如骰出 4 點，動物就跳 4 格。
       if(!reducedMotion){
         sprite.classList.remove('is-hopping');
@@ -608,6 +671,9 @@
     renderBoard();renderTurnActions();renderQuestion();renderDuel();
     focusMapTile(roll.position);
     playLandingTileEffect(roll.position);
+    if((state.log||[]).some(l=>l.at>=roll.at&&/支付.*過路費/.test(l.text))){
+      setTimeout(()=>{if(animationNonce===nonce)playSound('rent');},250);
+    }
     if(isMyTurn() || state.duel?.ownerId===me){
       const panel=state.duel?$('duel-panel'):state.pending?$('question-panel'):null;
       if(panel&&!panel.hidden)setTimeout(()=>{if(animationNonce===nonce)panel.scrollIntoView({behavior:reducedMotion?'instant':'smooth',block:'center'});},450);

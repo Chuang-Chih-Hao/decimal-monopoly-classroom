@@ -424,3 +424,56 @@ test('v1.8.0 機器人事件只有伺服器處理，不能由外部 Socket.IO �
   assert.ok(game.includes('room.players.filter(p=>!p.isBot)'));
   assert.doesNotMatch(server,/socket\.on\('botStep'/);
 });
+
+
+// v1.8.1：遊戲音效控制與實際動畫事件連結。
+test('v1.8.1 音效模組在主程式前載入，頁首有靜音、音量與試聽功能',()=>{
+  const scripts=['sound.js','app.js'].map(name=>index.indexOf('/'+name+'?v='));
+  assert.ok(scripts.every(n=>n>0)&&scripts[0]<scripts[1],'先載入音效引擎，再啟動遊戲');
+  for(const id of ['sound-toggle','sound-volume','sound-preview'])
+    assert.equal((index.match(new RegExp('id="'+id+'"','g'))||[]).length,1,id);
+  assert.match(index,/id="sound-volume" min="0" max="60" step="1" value="18"/);
+  assert.match(index,/id="sound-toggle"[^>]*aria-pressed="true"/);
+  assert.ok(app.includes('function initSoundControls()'));
+  assert.ok(app.includes("sound.setEnabled(!sound.getSettings().enabled)"));
+  assert.ok(app.includes("sound.setVolume(Number(slider.value)/100)"));
+  assert.ok(app.includes("document.addEventListener('pointerdown',unlockOnce"));
+  assert.ok(app.includes("document.addEventListener('keydown',unlockOnce"));
+});
+
+test('v1.8.1 擲骰、動物跳格、落點、購地與收租由動畫本身觸發對應音效',()=>{
+  const check=[
+    "playSound('dice-roll')","playSound('dice-result')","playSound('hop')",
+    "playSound('landing',{type:tile.type,tileId:tile.id})",
+    "playSound('purchase')","playSound('rent')"
+  ];
+  for(const item of check)assert.ok(app.includes(item),item);
+  const start=app.indexOf('async function playRollAnimation(');
+  const landing=app.indexOf('playLandingTileEffect(roll.position)',start);
+  const dice=app.indexOf("playSound('dice-roll')",start);
+  const result=app.indexOf("playSound('dice-result')",start);
+  const hop=app.indexOf("playSound('hop')",start);
+  assert.ok(start>0&&dice>start&&result>dice&&hop>result&&landing>hop);
+});
+
+test('v1.8.1 正確、錯誤、雙人對戰、成就與結算音效只在新事件時播放',()=>{
+  const start=app.indexOf('function playStateSounds(previous,next){');
+  const end=app.indexOf('function showToast(',start);
+  const block=app.slice(start,end);
+  assert.ok(start>0&&end>start);
+  assert.ok(block.includes('if(!previous)return;'));
+  for(const piece of ["playSound('finish')","playSound('duel-start')","playSound('duel-end')",
+    "playSound(next.lastResult.correct?'correct':'wrong')","playSound('achievement')"])
+    assert.ok(block.includes(piece),piece);
+  assert.ok(app.includes('playStateSounds(previous,next);'));
+  assert.ok(!app.slice(app.indexOf('function setInitialState(next){'),app.indexOf('function showSpotlight(')).includes('playStateSounds('));
+});
+
+test('v1.8.1 音效控制在手機維持可觸控且可鍵盤聚焦',()=>{
+  const css=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
+  for(const cls of ['.header-utilities','.sound-controls','.sound-toggle','.sound-preview','#sound-volume'])
+    assert.ok(css.includes(cls+'{'),cls);
+  assert.match(css,/\.sound-toggle:focus-visible,\.sound-preview:focus-visible,#sound-volume:focus-visible\{/);
+  assert.match(css,/@media\(max-width:480px\)\{[\s\S]*?\.sound-controls\{flex:1;justify-content:center/);
+  assert.ok(index.includes('aria-label="遊戲音效音量"'));
+});

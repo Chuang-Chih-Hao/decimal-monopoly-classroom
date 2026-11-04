@@ -640,3 +640,27 @@
   .lobby-remove-bot{padding:8px 7px;font-size:11px}
   .bot-mini-label{font-size:9px}
 }
+
+/* v1.8.1：教室音效控制，預設輕音量，手機上仍易於觸控 */
+.header-utilities{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:10px}
+.sound-controls{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid #e3e9e4;border-radius:14px;background:#fffdfbdc}
+.sound-toggle,.sound-preview{display:inline-flex;align-items:center;justify-content:center;min-height:36px;white-space:nowrap;border:1px solid #badacd;border-radius:9px;background:#edf8f2;color:#28634b;font-size:12px;font-weight:900;padding:6px 10px}
+.sound-toggle[aria-pressed="false"]{border-color:#dedbd4;color:#68747c;background:#f2f1ed}
+.sound-toggle:not(:disabled):hover,.sound-preview:not(:disabled):hover{filter:brightness(.96)}
+.sound-toggle:focus-visible,.sound-preview:focus-visible,#sound-volume:focus-visible{outline:3px solid #5a9e8a;outline-offset:2px}
+.sound-volume-label{display:flex;align-items:center;gap:7px;color:#5a6d78;font-weight:800;font-size:11px;white-space:nowrap}
+#sound-volume{accent-color:#4d9c7a;width:78px;cursor:pointer;height:24px}
+.sound-preview{min-width:35px;padding:6px 8px;font-size:17px}
+@media(max-width:850px){
+  .app-header{gap:10px;flex-wrap:wrap}
+  .header-utilities{margin-left:auto;gap:7px}
+  .sound-controls{padding:5px 6px;gap:5px}
+}
+@media(max-width:480px){
+  .header-utilities{width:100%;justify-content:space-between}
+  .sound-controls{flex:1;justify-content:center;min-width:0}
+  .sound-toggle{padding:6px 8px;font-size:11px}
+  #sound-volume{width:62px}
+  .sound-volume-label{gap:4px}
+  .connection{white-space:nowrap}
+}
