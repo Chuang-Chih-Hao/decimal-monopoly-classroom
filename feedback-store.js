@@ -15,7 +15,7 @@ function snapshot(room,state){
     id:room.archiveId,ownerHash:room.historyOwnerHash,roomCode:room.code,
     teacherName:teacher.name,createdAt:room.startedAt||room.createdAt,
     finishedAt:room.finishedAt||Date.now(),finishReason:room.finishReason||'normal',
-    bankruptPlayerName:room.players.find(p=>p.bankrupt)?.name||null,
+    bankruptPlayerName:state.players.find(p=>p.bankrupt)?.name||room.players.find(p=>p.bankrupt)?.name||null,
     playerCount:room.players.length,
     playerSummary:state.players.map(p=>({name:p.name,animal:p.animal,isBot:!!p.isBot,
       cash:p.cash,propertyCount:p.properties?.length||0,correct:p.correct,attempted:p.attempted,bankrupt:!!p.bankrupt})),

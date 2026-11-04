@@ -280,7 +280,7 @@ test('小遊戲逾時：已出招者獲勝；兩人皆未出招則免付補貼',
   assert.equal(room.lastDuel.winnerId,null);
 });
 
-test('補貼只付身上有的現金，且租金不足救援後仍會觸發加賽',()=>{
+test('救援耗盡現金後直接破產結算，不再進入雙人對戰',()=>{
   const {game,room,host,student}=setup();
   room.properties[1]=host.id;host.properties.push(1);
   game.nextTurn(room,host.id,true);
@@ -288,16 +288,21 @@ test('補貼只付身上有的現金，且租金不足救援後仍會觸發加�
   assert.equal(room.pending.type,'rescue');
   game.answer(room,student.id,chooseCorrect(room));
   assert.equal(student.cash,0);
-  assert.equal(room.phase,'duel');
-  room.duel.mode='rps';
-  game.duelChoice(room,host.id,2);game.duelChoice(room,student.id,0);
-  assert.equal(room.lastDuel.winnerId,student.id);
-  assert.equal(room.lastDuel.paid,40); // 屋主有足夠現金
-  assert.equal(student.cash,40);
+  assert.equal(room.status,'finished');
+  assert.equal(room.duel,null);
+  assert.equal(room.finishReason,'bankrupt');
+  assert.equal(room.bankruptPlayerId,student.id);
+});
+
+test('剪刀石頭布輸家僅支付剩餘現金，歸零時立即結算',()=>{
+  const {game,room,host,student}=setup();
   game.beginDuel(room,student,host,BOARD[1]);
-  room.duel.mode='rps';student.cash=2;
+  student.cash=2;
   game.duelChoice(room,host.id,0);game.duelChoice(room,student.id,2);
-  assert.equal(room.lastDuel.paid,2);assert.equal(student.cash,0);
+  assert.equal(room.lastDuel.paid,2);
+  assert.equal(student.cash,0);
+  assert.equal(room.status,'finished');
+  assert.equal(room.finishReason,'bankrupt');
 });
 
 test('30 分鐘到期後由伺服器自動結算；進行中的答題不會被半途截斷',()=>{
