@@ -230,34 +230,40 @@ test('租金先扣，再雙人猜拳，伺服器不外洩雙方未公開的手�
   assert.equal(student.cash,905);assert.equal(host.cash,895);
 });
 
-test('猜拳平手重賽、烏龜烏龜翹相同手指時攻擊方獲勝',()=>{
+test('剪刀石頭布平手後重賽，三種手勢正確分出勝負',()=>{
   const {game,room,host,student}=setup();
   game.beginDuel(room,student,host,BOARD[1]);
-  room.duel.mode='rps';room.duel.maxRounds=3;
+  assert.equal(room.duel.mode,'rps');
+  assert.equal(room.duel.maxRounds,3);
+  assert.equal(room.duel.attackerId,undefined);
+  assert.throws(()=>game.duelChoice(room,host.id,3),GameError);
   game.duelChoice(room,host.id,1);
   game.duelChoice(room,student.id,1);
   assert.equal(room.duel.round,2);
   assert.equal(room.phase,'duel');
-  room.duel.mode='turtle';room.duel.maxRounds=4;
-  room.duel.attackerId=host.id;
-  game.duelChoice(room,host.id,3);
-  game.duelChoice(room,student.id,3);
+  game.duelChoice(room,host.id,2); // 剪刀
+  game.duelChoice(room,student.id,0); // 石頭勝剪刀
   assert.equal(room.phase,'between');
-  assert.equal(room.lastDuel.winnerId,host.id);
-  assert.equal(student.cash,860);assert.equal(host.cash,940);
+  assert.equal(room.lastDuel.mode,'rps');
+  assert.equal(room.lastDuel.winnerId,student.id);
+  assert.equal(student.cash,940);
+  assert.equal(host.cash,860);
 });
 
-test('烏龜烏龜翹不同手指交換攻守；無限迴圈由回合上限阻止',()=>{
+test('猜拳三回合都平手後免付額外補貼，所有對戰只提供三種手勢',()=>{
   const {game,room,host,student}=setup();
   game.beginDuel(room,student,host,BOARD[1]);
-  room.duel.mode='turtle';room.duel.maxRounds=4;room.duel.attackerId=host.id;
-  for(let round=1;round<=4;round++){
+  for(let round=1;round<=3;round++){
     game.duelChoice(room,host.id,0);
-    game.duelChoice(room,student.id,1);
-    if(round<4){assert.equal(room.duel.round,round+1);assert.equal(room.duel.attackerId,round%2?student.id:host.id);}
+    game.duelChoice(room,student.id,0);
+    if(round<3)assert.equal(room.duel.round,round+1);
   }
-  assert.equal(room.phase,'between');assert.equal(room.lastDuel.winnerId,null);
-  assert.equal(host.cash,900);assert.equal(student.cash,900);
+  assert.equal(room.phase,'between');
+  assert.equal(room.lastDuel.winnerId,null);
+  assert.equal(room.lastDuel.round,3);
+  assert.equal(room.lastDuel.mode,'rps');
+  assert.equal(host.cash,900);
+  assert.equal(student.cash,900);
 });
 
 test('小遊戲逾時：已出招者獲勝；兩人皆未出招則免付補貼',()=>{
@@ -809,4 +815,130 @@ test('v1.8.0 由伺服器 tick 自動推進機器人回合，無機器人時不�
   game.tick(()=>sent++);
   assert.equal(sent,1);
   assert.equal(room.lastRoll.playerId,bot.id);
+});
+
+
+// v1.8.2：詳解原題、純剪刀石頭布、完成回合 60 秒自動換人。
+test('v1.8.2 題目作答後，詳解資料包含原題、四個選項和原本選擇',()=>{
+  const {game,room,host}=setup();
+  game.ask(room,'discount');
+  const q={...room.pending.question,options:[...room.pending.question.options]};
+  assert.equal(game.publicState(room,host.id).pending.question.text,q.text);
+  assert.equal(JSON.stringify(game.publicState(room,host.id)).includes('correctIndex'),false);
+  const wrong=chooseWrong(room);
+  game.answer(room,host.id,wrong);
+  const result=game.publicState(room,host.id).lastResult;
+  assert.equal(result.questionText,q.text);
+  assert.deepEqual(result.questionOptions,q.options);
+  assert.equal(result.correctIndex,q.correctIndex);
+  assert.equal(result.selectedIndex,wrong);
+  assert.equal(result.correctAnswer,q.correctText);
+  assert.equal(result.explanation,q.explanation);
+  assert.equal(result.correct,false);
+});
+
+test('v1.8.2 答對、逾時與房主略過題目，詳解一樣有原題但不會假裝學生選過答案',()=>{
+  const {game,room,host}=setup();
+  game.ask(room,'calc');
+  const q=room.pending.question;
+  game.answer(room,host.id,chooseCorrect(room));
+  assert.equal(room.lastResult.selectedIndex,q.correctIndex);
+  assert.equal(room.lastResult.questionText,q.text);
+  game.ask(room,'discount');
+  const overdue=room.pending.question.text;
+  room.pending.expiresAt=Date.now()-1;
+  game.tick(()=>{});
+  assert.equal(room.lastResult.questionText,overdue);
+  assert.equal(room.lastResult.selectedIndex,null);
+  assert.equal(room.lastResult.correct,false);
+  game.ask(room,'scam');
+  const skipped=room.pending.question.text;
+  game.nextTurn(room,host.id,true);
+  assert.equal(room.lastResult,null,'下個回合會清理前一題的解析內容');
+  assert.ok(room.log.some(l=>l.text.includes('房主略過')));
+});
+
+test('v1.8.2 進入回合完成狀態後才開始 60 秒倒數，並同步公開截止時間',()=>{
+  const {game,room,host}=setup();
+  const before=Date.now();
+  game.ask(room,'calc');
+  assert.equal(room.phase,'answering');
+  assert.equal(room.betweenExpiresAt,null);
+  assert.equal(game.publicState(room,host.id).betweenExpiresAt,null);
+  game.answer(room,host.id,chooseCorrect(room));
+  assert.equal(room.phase,'between');
+  assert.ok(room.betweenExpiresAt>=before+59_000);
+  assert.ok(room.betweenExpiresAt<=Date.now()+60_000);
+  assert.equal(game.publicState(room,host.id).betweenExpiresAt,room.betweenExpiresAt);
+  assert.equal(game.publicState(room,host.id).currentPlayerId,host.id);
+});
+
+test('v1.8.2 完成回合倒數到期自動換人，真人不按換人也不會卡住',()=>{
+  const {game,room,host,student}=setup();
+  game.ask(room,'calc');
+  game.answer(room,host.id,chooseCorrect(room));
+  const original=room.betweenExpiresAt;
+  let broadcasts=0;
+  game.tick(()=>broadcasts++);
+  assert.equal(broadcasts,0);
+  assert.equal(room.currentPlayerId,host.id);
+  assert.equal(room.betweenExpiresAt,original);
+  room.betweenExpiresAt=Date.now()-1;
+  game.tick(()=>broadcasts++);
+  assert.equal(broadcasts,1);
+  assert.equal(room.currentPlayerId,student.id);
+  assert.equal(room.phase,'rolling');
+  assert.equal(room.betweenExpiresAt,null);
+  assert.ok(room.log.some(l=>l.text.includes('60 秒內未按換人')));
+  game.tick(()=>broadcasts++);
+  assert.equal(broadcasts,1,'不可重複自動換人');
+});
+
+test('v1.8.2 在 60 秒內手動換人會取消倒數，後續不會再跳過一位',()=>{
+  const {game,room,host,student}=setup();
+  game.ask(room,'calc');
+  game.answer(room,host.id,chooseCorrect(room));
+  game.nextTurn(room,host.id);
+  assert.equal(room.currentPlayerId,student.id);
+  assert.equal(room.betweenExpiresAt,null);
+  game.tick(()=>{});
+  assert.equal(room.currentPlayerId,student.id);
+});
+
+test('v1.8.2 未完成作答、購地或雙人對戰時，不應用 60 秒回合倒數強制換人',()=>{
+  const {game,room,host,student}=setup();
+  game.ask(room,'calc');
+  room.betweenExpiresAt=Date.now()-1;
+  game.tick(()=>{});
+  assert.equal(room.phase,'answering');
+  assert.equal(room.currentPlayerId,host.id);
+  game.answer(room,host.id,chooseCorrect(room));
+  game.ask(room,'purchase',{tileId:1});
+  game.answer(room,host.id,chooseCorrect(room));
+  assert.equal(room.phase,'buying');
+  room.betweenExpiresAt=Date.now()-1;
+  game.tick(()=>{});
+  assert.equal(room.phase,'buying');
+  assert.equal(room.currentPlayerId,host.id);
+  game.decideBuy(room,host.id,false);
+  game.beginDuel(room,student,host,BOARD[1]);
+  assert.equal(room.phase,'duel');
+  room.betweenExpiresAt=Date.now()-1;
+  game.tick(()=>{});
+  assert.equal(room.phase,'duel');
+});
+
+test('v1.8.2 機器人仍可自動結束回合，倒數逾時不影響機器人的速度',()=>{
+  const game=new GameManager();
+  const {room,player:host}=game.newRoom('老師','capybara');
+  const bot=game.addBot(room,host.id);
+  game.start(room,host.id);
+  game.nextTurn(room,host.id,true);
+  game.ask(room,'calc');
+  game.answer(room,bot.id,chooseCorrect(room));
+  assert.equal(room.phase,'between');
+  assert.ok(room.betweenExpiresAt>Date.now()+50_000);
+  advanceBot(game,room);
+  assert.equal(room.currentPlayerId,host.id);
+  assert.equal(room.betweenExpiresAt,null);
 });

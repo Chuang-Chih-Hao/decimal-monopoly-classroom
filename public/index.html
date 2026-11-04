@@ -6,12 +6,12 @@
   <meta name="theme-color" content="#f6efe5" />
   <meta name="description" content="六年級小數大富翁：5 位學生與房主同時連線，邊玩邊練習小數、折扣、比價與應用題。" />
   <title>小數富翁探險島｜六年級數學連線大富翁</title>
-  <link rel="stylesheet" href="/style.css?v=1.8.1" />
+  <link rel="stylesheet" href="/style.css?v=1.8.2" />
   <script src="/socket.io/socket.io.js" defer></script>
-  <script src="/board-layout.js?v=1.8.1" defer></script>
-  <script src="/player-colors.js?v=1.8.1" defer></script>
-  <script src="/sound.js?v=1.8.1" defer></script>
-  <script src="/app.js?v=1.8.1" defer></script>
+  <script src="/board-layout.js?v=1.8.2" defer></script>
+  <script src="/player-colors.js?v=1.8.2" defer></script>
+  <script src="/sound.js?v=1.8.2" defer></script>
+  <script src="/app.js?v=1.8.2" defer></script>
 </head>
 <body>
 <div class="app">
@@ -34,7 +34,7 @@
       <div class="eyebrow">✦ 小數應用主題教室 ✦</div>
       <h1>把小數變成你的<br/><em>致富超能力！</em></h1>
       <p>擲骰前進、算折扣、拆穿黑心商人，搶購店面挑戰最終 Boss。<br/>30 格經典方格棋盤、雙人快速對決，每一格都藏著新的數學冒險！</p>
-      <div class="feature-tags"><span>🧮 小數四則</span><span>🏷️ 折扣比價</span><span>🏠 買地收租</span><span>⚔️ 猜拳／烏龜烏龜翹</span><span>🐉 兩題 Boss</span></div>
+      <div class="feature-tags"><span>🧮 小數四則</span><span>🏷️ 折扣比價</span><span>🏠 買地收租</span><span>⚔️ 剪刀石頭布</span><span>🐉 兩題 Boss</span></div>
       <div class="entry-decoration">🐈 <span>🦫</span> 🐼</div>
     </div>
     <div class="entry-form panel">
@@ -80,7 +80,7 @@
       <div class="play-grid">
         <section class="board-column">
           <div class="section-head"><div><span class="overline">DECIMAL ISLAND</span><h2>小數富翁地圖</h2></div><div class="game-clock-group"><div id="round-chip" class="round-chip">第 1 輪 · ♾️ 無限輪</div><div id="session-clock" class="session-clock">⏱️ 30:00</div></div></div>
-          <div class="track-tools"><span class="track-instruction">🎲 30 格經典大富翁棋盤 · 換人自動聚焦；可自由縮放、拖曳與滑動</span><div class="track-zoom" aria-label="棋盤視野控制"><button type="button" class="btn outline small" id="map-overview">全覽</button><button type="button" class="btn outline small" id="map-zoom-out" aria-label="縮小棋盤">−</button><span id="map-zoom-label" class="map-zoom-label" aria-live="polite">100%</span><button type="button" class="btn outline small" id="map-zoom-in" aria-label="放大棋盤">＋</button><button type="button" class="btn outline small" id="map-fullsize">🎯 聚焦目前玩家</button></div></div><div id="board-wrapper" class="board-wrapper" aria-label="棋盤可用滑動或拖曳調整位置"><div id="board" class="board" aria-label="大富翁遊戲棋盤"><div id="board-center" class="board-center"></div></div></div>
+          <div class="track-tools"><span class="track-instruction">🎲 30 格經典方格棋盤 · 依裝置自動適配起始比例，換人不強制放大；可自行縮放、拖曳或滑動</span><div class="track-zoom" aria-label="棋盤視野控制"><button type="button" class="btn outline small" id="map-overview">全覽</button><button type="button" class="btn outline small" id="map-zoom-out" aria-label="縮小棋盤">−</button><span id="map-zoom-label" class="map-zoom-label" aria-live="polite">100%</span><button type="button" class="btn outline small" id="map-zoom-in" aria-label="放大棋盤">＋</button><button type="button" class="btn outline small" id="map-fullsize">🎯 聚焦目前玩家</button></div></div><div id="board-wrapper" class="board-wrapper" aria-label="棋盤可用滑動或拖曳調整位置"><div id="board" class="board" aria-label="大富翁遊戲棋盤"><div id="board-center" class="board-center"></div></div></div>
           <div class="board-legend"><span><b class="legend-square prop"></b>可購買店面</span><span><b class="legend-square event"></b>答題事件</span><span>🏁 經過起點 +$200</span><span>⚔️ 別人的房產：繳租後雙人加賽</span></div>
           <section class="panel history-panel"><h3>📣 冒險紀錄 <small>最新事件置頂</small></h3><div id="history" class="history" aria-live="polite"></div></section>
         </section>

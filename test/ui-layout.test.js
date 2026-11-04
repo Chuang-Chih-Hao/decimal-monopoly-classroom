@@ -477,3 +477,73 @@ test('v1.8.1 音效控制在手機維持可觸控且可鍵盤聚焦',()=>{
   assert.match(css,/@media\(max-width:480px\)\{[\s\S]*?\.sound-controls\{flex:1;justify-content:center/);
   assert.ok(index.includes('aria-label="遊戲音效音量"'));
 });
+
+
+// v1.8.2：詳解保留原題／選項、純剪刀石頭布、60 秒自動換人、響應式地圖。
+test('v1.8.2 解題解析會完整對照原題、四個選項、學生選擇與正解',()=>{
+  const start=app.indexOf('function renderResult(){');
+  const end=app.indexOf('function landValue(',start);
+  const block=app.slice(start,end);
+  assert.ok(start>=0&&end>start);
+  for(const phrase of ['r.questionText','r.questionOptions','r.correctIndex','r.selectedIndex',
+    "esc(r.questionText)","esc(answer)",'r.correctAnswer','r.explanation','result-question-options'])
+    assert.ok(block.includes(phrase),phrase);
+  assert.ok(block.includes('is-selected-wrong'));
+  assert.ok(block.includes('is-correct'));
+  const css=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
+  assert.match(css,/\.result-question-option\.is-correct\{/);
+  assert.match(css,/\.result-question-option\.is-selected-wrong\{/);
+});
+
+test('v1.8.2 只顯示剪刀石頭布，不再提供烏龜烏龜翹或五種手指',()=>{
+  const duel=app.slice(app.indexOf('function renderDuel(){'),app.indexOf('function updateSessionClock(){'));
+  const game=fs.readFileSync(path.join(__dirname,'../game.js'),'utf8');
+  assert.ok(app.includes("const rpsOptions=[['🪨','石頭'],['📄','布'],['✂️','剪刀']]"));
+  assert.doesNotMatch(app,/turtleOptions|烏龜烏龜翹/);
+  assert.doesNotMatch(duel,/d\.mode==='turtle'|attackerId/);
+  assert.ok(duel.includes("const options=rpsOptions"));
+  assert.ok(duel.includes('剪刀石頭布對決'));
+  assert.ok(game.includes("const mode='rps'"));
+  assert.doesNotMatch(game,/烏龜烏龜翹|'turtle'/);
+  assert.ok(index.includes('⚔️ 剪刀石頭布'));
+});
+
+test('v1.8.2 每次完成回合會顯示 60 秒自動換人倒數',()=>{
+  const start=app.indexOf('function renderTurnActions(){');
+  const end=app.indexOf('function renderDuel(){',start);
+  const snippet=app.slice(start,end);
+  assert.ok(snippet.includes('id="between-timer"'));
+  assert.ok(snippet.includes('updateTimer();'));
+  assert.ok(app.includes('state.betweenExpiresAt'));
+  assert.ok(app.includes('系統會自動換人'));
+  assert.ok(app.includes("request('next')"));
+});
+
+test('v1.8.2 地圖依裝置初始適配、不再在換人或選房產時強制縮放',()=>{
+  const focus=app.slice(app.indexOf('function renderBoard(){'),app.indexOf('function focusMapTile('));
+  const asset=app.slice(app.indexOf('function renderMyAssets(){'),app.indexOf('function renderScoreboard(){'));
+  assert.ok(app.includes('function responsiveMapZoom(){'));
+  assert.ok(app.includes('function fitMapToDevice(){'));
+  assert.ok(app.includes('window.addEventListener(\'resize\''));
+  assert.ok(app.includes('mapZoomManual=true'));
+  assert.ok(app.includes('if(!mapZoomInitialized)fitMapToDevice();'));
+  assert.ok(app.includes("setMapZoom(responsiveMapZoom(),{keepCenter:true})"));
+  assert.doesNotMatch(focus,/if\(mapZoom<1\)setMapZoom\(1/);
+  assert.doesNotMatch(asset,/setMapZoom\(1\)/);
+  const control=app.slice(app.indexOf("$('map-fullsize').addEventListener"),app.indexOf('// 電腦可按住滑鼠'));
+  assert.ok(control.includes('focusMapTile(activePlayer()?.position'));
+  assert.doesNotMatch(control,/setMapZoom\(Math\.max\(1,mapZoom\)\)/);
+  for(const id of ['map-zoom-in','map-zoom-out','map-overview','map-fullsize'])
+    assert.ok(index.includes('id="'+id+'"'));
+});
+
+test('v1.8.2 手機初始比例有可讀下限，桌面按容器比例調整',()=>{
+  const snippet=app.slice(app.indexOf('const clampZoom='),app.indexOf('function setMapZoom('));
+  assert.ok(snippet.includes('Math.max(.35,Math.min(.98,available/layout.WIDTH))'));
+  const factory=new Function('boardWrapper','layout',snippet+'\nreturn responsiveMapZoom;');
+  const mobile=factory({clientWidth:375},{WIDTH:1450});
+  const desktop=factory({clientWidth:1150},{WIDTH:1450});
+  assert.equal(mobile(),.35);
+  assert.ok(desktop()>.7&&desktop()<.9);
+  assert.ok(desktop()>mobile());
+});

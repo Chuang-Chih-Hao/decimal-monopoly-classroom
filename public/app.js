@@ -1,7 +1,7 @@
 /* 小數富翁前端：所有資產、擲骰、判分都以伺服器狀態為準。 */
 (() => {
   'use strict';
-  const CLIENT_VERSION='1.8.1';
+  const CLIENT_VERSION='1.8.2';
   const socket=io({transports:['websocket','polling'],reconnection:true});
   const sound=window.DecimalMonopolyAudio;
   const playSound=(kind,detail)=>sound?.play(kind,detail);
@@ -58,6 +58,8 @@
   const typeNames={purchase:'購地數學考驗',calc:'小數神算',discount:'折扣挑戰',compare:'比價擂台',scam:'破解黑心商人',chest:'寶箱密碼',chance:'機會卡',fate:'命運卡',boss:'終極 Boss',rescue:'緊急救援'};
   let selectedAnimal='capybara';
   let mapZoom=1;
+  let mapZoomInitialized=false;
+  let mapZoomManual=false;
   let mapFocusKey=null;
   let state=null,me=null;
   let toastTimer;
@@ -126,7 +128,7 @@
   }
   function clearSession(){
     animationNonce++;activeRollAnimation=null;deferredFeedback=null;
-    seenRollId=null;seenLogId=null;seenDuelResultId=null;seenAchievementId=null;mapFocusKey=null;mapZoom=1;reflectionDirty=false;
+    seenRollId=null;seenLogId=null;seenDuelResultId=null;seenAchievementId=null;mapFocusKey=null;mapZoom=1;mapZoomInitialized=false;mapZoomManual=false;reflectionDirty=false;
     $('event-spotlight').hidden=true;
     tokenData=null;me=null;state=null;
     try{localStorage.removeItem('decimal-monopoly-session');}catch{}
@@ -135,7 +137,7 @@
   // 首次加入／重新連線時，以伺服器畫面為準，不重播已經結束的擲骰。
   function setInitialState(next){
     animationNonce++;activeRollAnimation=null;deferredFeedback=null;
-    state=next;mapFocusKey=null;reflectionDirty=false;
+    state=next;mapFocusKey=null;mapZoomInitialized=false;mapZoomManual=false;reflectionDirty=false;
     seenRollId=next.lastRoll?.id??null;
     seenDuelResultId=next.lastDuel?.id??null;
     seenLogId=next.log?.[0]?.id??null;
@@ -312,6 +314,17 @@
   renderAnimalPicker();
   const boardWrapper=$('board-wrapper');
   const clampZoom=value=>Math.min(1.65,Math.max(.25,Math.round(value*100)/100));
+  // 初始比例依棋盤容器寬度決定。較窄裝置至少保留可辨識的格子尺寸，
+  // 不會在每次換人或選取房產時強制切回 100%。
+  function responsiveMapZoom(){
+    const available=Math.max(1,boardWrapper.clientWidth-18);
+    return clampZoom(Math.max(.35,Math.min(.98,available/layout.WIDTH)));
+  }
+  function fitMapToDevice(){
+    if(!boardWrapper.clientWidth)return;
+    mapZoomInitialized=true;
+    setMapZoom(responsiveMapZoom(),{keepCenter:false});
+  }
   function setMapZoom(value,{keepCenter=true}={}){
     const board=$('board');
     const oldZoom=mapZoom;
@@ -326,12 +339,14 @@
   }
   function adjustZoom(value){
     if(activeRollAnimation){showToast('棋子移動結束後就能自由縮放。');return;}
+    mapZoomManual=true;
     setMapZoom(value);
   }
   $('map-overview').addEventListener('click',()=>{
     if(activeRollAnimation){showToast('棋子移動結束後就能切換全覽。');return;}
     const x=(boardWrapper.clientWidth-24)/layout.WIDTH;
     const y=(Math.min(boardWrapper.clientHeight||590,window.innerWidth<=650?480:590)-24)/layout.HEIGHT;
+    mapZoomManual=true;
     setMapZoom(Math.min(.96,x,y),{keepCenter:false});
     boardWrapper.scrollTo({left:0,top:0,behavior:'auto'});
   });
@@ -339,8 +354,13 @@
   $('map-zoom-out').addEventListener('click',()=>adjustZoom(mapZoom-.15));
   $('map-fullsize').addEventListener('click',()=>{
     if(activeRollAnimation){showToast('棋子移動結束後即可重新聚焦。');return;}
-    setMapZoom(Math.max(1,mapZoom));
     focusMapTile(activePlayer()?.position??0,'smooth');
+  });
+  window.addEventListener('resize',()=>{
+    // 只在尚未手動縮放的情況下跟隨裝置尺寸，保留玩家按 +/- 設定的比例。
+    if(state?.status==='playing'&&mapZoomInitialized&&!mapZoomManual&&!activeRollAnimation){
+      setMapZoom(responsiveMapZoom(),{keepCenter:true});
+    }
   });
   // 電腦可按住滑鼠拖曳棋盤，手機和平板則使用原生觸控滑動。
   let pan=null;
@@ -492,7 +512,7 @@
     $('lobby-screen').hidden=state.status!=='lobby';
     $('playing-screen').hidden=state.status!=='playing';
     $('end-screen').hidden=state.status!=='finished';
-    if(state.status==='lobby')renderLobby();
+    if(state.status==='lobby'){mapZoomInitialized=false;mapZoomManual=false;renderLobby();}
     if(state.status==='playing')renderPlaying();
     if(state.status==='finished')renderEnd();
   }
@@ -570,7 +590,6 @@
       // 所有裝置都收到同一個 currentPlayerId；只有換人時強制聚焦，後續可自行移動畫面。
       requestAnimationFrame(()=>{
         if(state?.status==='playing'&&state.currentPlayerId===expectedPlayerId){
-          if(mapZoom<1)setMapZoom(1,{keepCenter:false});
           focusMapTile(from,reducedMotion?'auto':'smooth');
         }
       });
@@ -720,6 +739,7 @@
     const current=activePlayer();
     $('current-player').innerHTML=current
       ?`<div class="current-identity" style="${colorStyle(current)}"><div class="active-animal">${animalHtml(current.animal)}</div><div><div class="active-name">${esc(current.name)}${isMyTurn()?' ✨':''}</div><div class="active-sub"><span class="person-color-dot"></span>${colorFor(current).name}棋子 · 現金 ${money(current.cash)} · ${current.properties.length} 處房產</div></div></div>`:'';
+    if(!mapZoomInitialized)fitMapToDevice();
     if(!activeRollAnimation?.started)renderBoard();
     renderTurnActions();renderQuestion();renderDuel();renderResult();renderMyAssets();renderAchievements();renderScoreboard();renderLog();
     syncQuestionPanelPosition();
@@ -740,14 +760,16 @@
       el.innerHTML=`<div class="phase-help">${turn?'🏡 答對了！決定要不要購買這間店。':'🏡 等待 '+esc(activePlayer()?.name)+' 決定是否購地…'}</div>`;
     }else if(phase==='duel'){
       const d=state.duel;
-      el.innerHTML=`<div class="phase-help">⚔️ 屋主與租客正在${d?.mode==='rps'?'猜拳':'玩烏龜烏龜翹'}！雙方出手後才公開手勢；請看下方對戰區。</div>`;
+      el.innerHTML='<div class="phase-help">⚔️ 屋主與租客正在玩剪刀石頭布！雙方出手後才公開手勢；請看下方對戰區。</div>';
     }else if(phase==='between'){
-      el.innerHTML=turn?'<button id="next-btn" class="btn primary full">➡️ 完成回合，換下一位</button>':`<div class="phase-help">等待 ${esc(activePlayer()?.name)} 結束回合…</div>`;
+      const countdown='<div class="phase-help between-turn-help" id="between-timer" aria-live="off"></div>';
+      el.innerHTML=turn?'<button id="next-btn" class="btn primary full">➡️ 完成回合，換下一位</button>'+countdown
+        :`<div class="phase-help">等待 ${esc(activePlayer()?.name)} 結束回合…</div>`+countdown;
       $('next-btn')?.addEventListener('click',()=>request('next'));
+      updateTimer();
     }
   }
   const rpsOptions=[['🪨','石頭'],['📄','布'],['✂️','剪刀']];
-  const turtleOptions=[['①','大拇指'],['②','食指'],['③','中指'],['④','無名指'],['⑤','小指']];
   function renderDuel(){
     const panel=$('duel-panel'),d=state.duel;
     if(!d){panel.hidden=true;return;}
@@ -756,17 +778,13 @@
     const participant=[d.renterId,d.ownerId].includes(me);
     const mySide=me===d.renterId?'renter':'owner';
     const submitted=d.ready?.[mySide];
-    const options=d.mode==='rps'?rpsOptions:turtleOptions;
-    const attacker=state.players.find(p=>p.id===d.attackerId);
-    const title=d.mode==='rps'?'✊ 猜拳大對決':'🐢 烏龜烏龜翹';
-    const how=d.mode==='rps'
-      ?'雙方各選石頭、布或剪刀。石頭勝剪刀、剪刀勝布、布勝石頭。平手重來，最多 3 回合。'
-      :'雙方各選一根手指。若選到相同手指，由本回合「喊口令」的攻擊方獲勝；不同就交換攻守，最多 4 回合。';
-    const prev=d.lastExchange?`<div class="duel-last">上一回合：${esc(options[d.lastExchange.renterChoice]?.[1])} vs ${esc(options[d.lastExchange.ownerChoice]?.[1])}，${d.mode==='rps'?'平手！':'手指不同，交換攻守！'}</div>`:'';
+    const options=rpsOptions;
+    const title='✊ 剪刀石頭布對決';
+    const how='雙方各選石頭、布或剪刀。石頭勝剪刀、剪刀勝布、布勝石頭。平手重來，最多 3 回合。';
+    const prev=d.lastExchange?`<div class="duel-last">上一回合：${esc(options[d.lastExchange.renterChoice]?.[1])} vs ${esc(options[d.lastExchange.ownerChoice]?.[1])}，平手！</div>`:'';
     panel.innerHTML=`<div class="question-tag">⚔️ 抵達他人房產 · 過路費已先結算</div><h3>${title} <small>第 ${d.round}/${d.maxRounds} 回合</small></h3>
       <p class="duel-how">${how}</p><div class="duel-vs"><div>${animalHtml(renter?.animal)} <strong>${esc(renter?.name||'租客')}</strong><small>租客 ${d.ready?.renter?'✓ 已出招':'等待出招'}</small></div><b>VS</b><div>${animalHtml(owner?.animal)} <strong>${esc(owner?.name||'屋主')}</strong><small>屋主 ${d.ready?.owner?'✓ 已出招':'等待出招'}</small></div></div>
       <div class="duel-stake">💰 輸家額外補貼最多 ${money(d.stake)} 給贏家（現金不足只付現有金額）；平手不付。</div>
-      ${d.mode==='turtle'?`<div class="duel-attacker">📣 本回合喊「烏龜烏龜翹」的是：<strong>${esc(attacker?.name||'屋主')}</strong></div>`:''}
       ${prev}<div class="duel-timer" id="duel-timer"></div>
       ${participant&&!submitted&&!activeRollAnimation?`<div class="duel-options">${options.map(([emoji,label],i)=>`<button class="duel-choice" data-duel-choice="${i}"><span>${emoji}</span>${esc(label)}</button>`).join('')}</div>`
         :`<p class="duel-wait">${submitted?'✅ 你已出手！手勢保密，等對方出招。':participant?'🎲 角色正在移動，稍後可以出手。':'👀 觀戰中：雙方出手後才會公開。'}</p>`}`;
@@ -840,6 +858,11 @@
     }
     const st=$('story-timer-label');
     if(st&&p?.type==='story')st.textContent='⏱️ 還有 '+Math.max(0,Math.ceil((p.expiresAt-Date.now())/1000))+' 秒選擇；逾時自動採取穩健方案。';
+    const betweenTimer=$('between-timer');
+    if(betweenTimer&&state?.phase==='between'){
+      const remaining=Math.max(0,Math.ceil(((state.betweenExpiresAt||Date.now())-Date.now())/1000));
+      betweenTimer.textContent=`⏳ 還有 ${remaining} 秒，若未按「完成回合」，系統會自動換人。`;
+    }
     const d=state?.duel,dt=$('duel-timer');
     if(dt&&d)dt.textContent=`⏱️ 本次出手剩下 ${Math.max(0,Math.ceil((d.expiresAt-Date.now())/1000))} 秒；超時未出手可能判負。`;
     updateSessionClock();
@@ -849,9 +872,20 @@
     const el=$('result-panel'),r=state.lastResult;
     if(!r){el.hidden=true;return;}
     el.hidden=false;el.classList.toggle('is-wrong',!r.correct);
+    const questionHtml=r.questionText?`<div class="result-question"><div class="result-question-heading">📖 本題題目</div>
+      <p class="result-question-text">${esc(r.questionText)}</p>
+      <div class="result-question-options">${(r.questionOptions||[]).map((answer,index)=>{
+        const isCorrect=index===r.correctIndex,wasSelected=index===r.selectedIndex;
+        return `<div class="result-question-option${isCorrect?' is-correct':''}${wasSelected&&!isCorrect?' is-selected-wrong':''}">
+          <span class="option-letter">${String.fromCharCode(65+index)}</span>
+          <span>${esc(answer)}</span>${isCorrect?'<strong>✅ 正確</strong>':wasSelected?'<strong>你選的</strong>':''}
+        </div>`;
+      }).join('')}</div>
+      ${r.selectedIndex===null?'<div class="result-choice-hint">本題未提交答案（逾時或由房主略過）。</div>':''}
+    </div>`:'';
     const poll=state.lastPoll;
     const pollHtml=poll?`<div class="spectator-summary">👀 本題觀戰：${poll.correctCount} / ${poll.total} 人猜對${poll.myCorrect===true?' · ✅ 你也猜對了！':poll.myCorrect===false?' · 📘 下次再挑戰！':''}</div>`:'';
-    el.innerHTML=`<div class="result-head">${r.correct?'✅ 計算正確！':'📘 解題解析'}</div><div class="result-answer">正確答案：<strong>${esc(r.correctAnswer)}</strong><br/>${esc(r.explanation)}</div>${pollHtml}`;
+    el.innerHTML=`<div class="result-head">${r.correct?'✅ 計算正確！':'📘 解題解析'}</div>${questionHtml}<div class="result-answer">正確答案：<strong>${esc(r.correctAnswer)}</strong><br/>${esc(r.explanation)}</div>${pollHtml}`;
   }
   function landValue(p){return p.properties.reduce((sum,id)=>sum+(state.board[id]?.price||0),0);}
   function wealth(p){return p.cash+landValue(p);}
@@ -867,7 +901,6 @@
       <div class="assets-property-list">${properties.length?properties.map(tile=>`<button type="button" class="asset-property" style="${colorStyle(p)}" data-asset-tile="${tile.id}" title="聚焦到 ${esc(tile.name)}"><span class="asset-property-name">${esc(tile.icon)} ${esc(tile.name)}</span><span>價值 ${money(tile.price)} · 租金 ${money(tile.rent)}</span></button>`).join(''):'<span class="assets-empty">還沒有房產。答對購地題後就能購買，土地會以你的代表色標示。</span>'}</div>`;
     el.querySelectorAll('[data-asset-tile]').forEach(btn=>btn.addEventListener('click',()=>{
       if(activeRollAnimation){showToast('棋子正在移動，請稍後再查看房產。');return;}
-      if(mapZoom<.8)setMapZoom(1);
       focusMapTile(Number(btn.dataset.assetTile),'smooth');
       boardWrapper.scrollIntoView({behavior:reducedMotion?'auto':'smooth',block:'center'});
     }));

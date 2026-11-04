@@ -664,3 +664,18 @@
   .sound-volume-label{gap:4px}
   .connection{white-space:nowrap}
 }
+
+/* v1.8.2：在解題解析中保留原題與選項，方便學生對照算式。 */
+.result-question{padding:13px 14px;margin:11px 0 12px;border-radius:13px;background:#fffdf5;border:1px solid #e8dec8}
+.result-question-heading{font-size:12px;font-weight:900;color:#82632c;margin-bottom:7px;letter-spacing:.02em}
+.result-question-text{font-size:14px;line-height:1.85;font-weight:800;margin:0 0 10px;white-space:pre-wrap;overflow-wrap:anywhere}
+.result-question-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.result-question-option{display:flex;align-items:flex-start;gap:6px;min-width:0;padding:8px;border-radius:9px;background:#fff;border:1px solid #e3e6e4;font-size:12px;line-height:1.55;overflow-wrap:anywhere}
+.result-question-option .option-letter{font-size:11px;font-weight:900;background:#eaf0f2;color:#506575;padding:1px 6px;border-radius:7px;flex:none}
+.result-question-option span:nth-child(2){min-width:0;flex:1}
+.result-question-option strong{font-size:10px;white-space:nowrap;flex:none}
+.result-question-option.is-correct{background:#e7f7ed;border-color:#82c69a;color:#245c43}
+.result-question-option.is-selected-wrong{background:#fff0e9;border-color:#e5a291;color:#8f4f40}
+.result-choice-hint{font-size:11px;margin-top:8px;color:#7a6c61}
+.between-turn-help{color:#3c6686;font-size:12px;line-height:1.6;margin-top:7px;font-weight:800}
+@media(max-width:650px){.result-question{padding:10px}.result-question-options{grid-template-columns:1fr}.result-question-text{font-size:13px}}
