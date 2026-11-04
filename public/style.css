@@ -679,3 +679,17 @@
 .result-choice-hint{font-size:11px;margin-top:8px;color:#7a6c61}
 .between-turn-help{color:#3c6686;font-size:12px;line-height:1.6;margin-top:7px;font-weight:800}
 @media(max-width:650px){.result-question{padding:10px}.result-question-options{grid-template-columns:1fr}.result-question-text{font-size:13px}}
+
+/* v1.8.3：冒險彈窗用短標題 + 一段完整訊息，不再把同一句分配到不同字級。 */
+.event-spotlight .spotlight-copy{min-width:0;max-width:100%;overflow-wrap:anywhere}
+.event-spotlight .spotlight-copy .spotlight-title{
+  display:block;font-size:clamp(16px,1.5vw,20px);font-weight:900;line-height:1.45;
+}
+.event-spotlight .spotlight-copy .spotlight-detail{
+  display:block;font-size:clamp(13px,1.25vw,15px);font-weight:700;
+  line-height:1.7;color:#526978;white-space:normal;overflow-wrap:anywhere;
+}
+@media(max-width:640px){
+  .event-spotlight .spotlight-copy .spotlight-title{font-size:16px}
+  .event-spotlight .spotlight-copy .spotlight-detail{font-size:13px;line-height:1.6}
+}

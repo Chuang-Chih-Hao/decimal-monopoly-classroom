@@ -1,7 +1,7 @@
 /* 小數富翁前端：所有資產、擲骰、判分都以伺服器狀態為準。 */
 (() => {
   'use strict';
-  const CLIENT_VERSION='1.8.2';
+  const CLIENT_VERSION='1.8.3';
   const socket=io({transports:['websocket','polling'],reconnection:true});
   const sound=window.DecimalMonopolyAudio;
   const playSound=(kind,detail)=>sound?.play(kind,detail);
@@ -148,12 +148,29 @@
     const box=$('event-spotlight');
     if(!box)return;
     box.hidden=false;box.className=`event-spotlight kind-${kind}`;
-    box.innerHTML=`<span class="spotlight-icon">${esc(icon)}</span><div class="spotlight-copy"><strong>${esc(title)}</strong><span>${esc(detail)}</span></div>`;
+    box.innerHTML=`<span class="spotlight-icon">${esc(icon)}</span><div class="spotlight-copy"><strong class="spotlight-title">${esc(title)}</strong><span class="spotlight-detail">${esc(detail)}</span></div>`;
     // 重新播放彈出動畫，所有玩家都能注意到最新事件。
     void box.offsetWidth;
     box.classList.add('is-visible');
     clearTimeout(spotlightTimer);
     spotlightTimer=setTimeout(()=>{box.classList.remove('is-visible');setTimeout(()=>{if(!box.classList.contains('is-visible'))box.hidden=true;},260);},3100);
+  }
+
+  // 冒險事件以固定短標題與完整說明呈現。過去依 34 字直接切割，
+  // 可能把「需付 $75」拆到小字行，造成同一句文字出現不一致字級。
+  function spotlightFromLog(text){
+    const purchase=/買下「[^」]+」/.test(text);
+    const rent=/過路費/.test(text);
+    const rescue=/救援成功|救援未成功/.test(text);
+    const positive=/買下|救援成功|獲得|抽中/.test(text);
+    const title=purchase?'🏠 購地成功！'
+      :rent?'💰 過路費結算'
+      :rescue?'🛟 救援結果'
+      :/繳交稅金/.test(text)?'🧾 稅金結算'
+      :/放棄購買/.test(text)?'🏡 購地決定'
+      :positive?'✨ 冒險獎勵'
+      :'📣 冒險事件';
+    return {icon:positive?'🌟':'📣',title,detail:text,kind:positive?'success':'event'};
   }
   function highlightNewEvents(previous,next){
     if(!previous||next.status!=='playing')return;
@@ -186,8 +203,7 @@
     }
     const selected=fresh.find(l=>/買下|過路費|救援成功|救援未成功|繳交稅金|獲得|失去|抽中|暫停|完成|放棄購買/.test(l.text));
     if(!selected)return;
-    const positive=/買下|救援成功|獲得|抽中/.test(selected.text);
-    const item={icon:positive?'🌟':'📣',title:selected.text.slice(0,34),detail:selected.text.length>34?selected.text.slice(34,100):'',kind:positive?'success':'event'};
+    const item=spotlightFromLog(selected.text);
     if(activeRollAnimation)deferredFeedback=item;
     else showSpotlight(item.icon,item.title,item.detail,item.kind);
   }

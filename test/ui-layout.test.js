@@ -547,3 +547,49 @@ test('v1.8.2 手機初始比例有可讀下限，桌面按容器比例調整',()
   assert.ok(desktop()>.7&&desktop()<.9);
   assert.ok(desktop()>mobile());
 });
+
+// v1.8.3：購地通知原本任意依字數切割，導致同一句大小字混用。
+test('v1.8.3 購地成功的玩家、店面、過路費都在同一段完整說明',()=>{
+  const start=app.indexOf('function spotlightFromLog(text){');
+  const end=app.indexOf('  function highlightNewEvents(',start);
+  assert.ok(start>=0&&end>start,'應有語意化的事件通知格式函式');
+  const snippet=app.slice(start,end);
+  const format=new Function(snippet+'\nreturn spotlightFromLog;')();
+  const examples=[
+    '🎉 小數機器人1 以 $300 買下「運動用品店」！其他玩家經過需付 $75。',
+    '🎉 姓名比較長的機器人冒險家 以 $420 買下「超級無敵奇幻玩具王國」！其他玩家經過需付 $105。',
+    '🎉 '+('機器人玩家'.repeat(17))+' 以 $260 買下「動物旅館」！其他玩家經過需付 $65。'
+  ];
+  for(const line of examples){
+    const item=format(line);
+    assert.equal(item.title,'🏠 購地成功！');
+    assert.equal(item.detail,line,'原始事件必須完整保留，不能依字數截斷');
+    assert.equal(item.kind,'success');
+    assert.ok(!item.title.includes('需付'));
+  }
+  assert.ok(app.includes('const item=spotlightFromLog(selected.text)'));
+  assert.doesNotMatch(app,/selected\.text\.slice\(0,34\)|selected\.text\.slice\(34,100\)/);
+});
+
+test('v1.8.3 其他長事件也不截斷，且標題與訊息有獨立一致的字級',()=>{
+  const src=app.slice(app.indexOf('function spotlightFromLog(text){'),app.indexOf('  function highlightNewEvents('));
+  const format=new Function(src+'\nreturn spotlightFromLog;')();
+  for(const msg of [
+    '🏠 冒險家支付 $75 過路費給屋主小數機器人。',
+    '🛟 救援成功！'+('額外補助 '.repeat(22)),
+    '🧾 玩家繳交稅金 $60。',
+    '↪️ 玩家放棄購買「運動用品店」。'
+  ]){
+    const result=format(msg);
+    assert.equal(result.detail,msg);
+    assert.ok(result.title.length<=12);
+  }
+  const css=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
+  assert.ok(app.includes('class="spotlight-title"'));
+  assert.ok(app.includes('class="spotlight-detail"'));
+  assert.match(css,/\.event-spotlight \.spotlight-copy \.spotlight-title\s*\{[^}]*font-size:/);
+  assert.match(css,/\.event-spotlight \.spotlight-copy \.spotlight-detail\s*\{[^}]*font-size:/);
+  assert.match(css,/\.spotlight-detail\s*\{[^}]*overflow-wrap:anywhere/);
+  assert.match(css,/@media\(max-width:640px\)\{[^}]*\.event-spotlight \.spotlight-copy \.spotlight-title/);
+  assert.ok(index.includes('/app.js?v=1.8.3'));
+});
