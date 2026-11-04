@@ -144,7 +144,7 @@
 - **不變的離房安全流程**：保留點擊後的確認視窗；房主離開等待室會解散該房間、一般學生只退出自己的席位。沒有修改遊戲伺服器、Socket.IO 邏輯與房間狀態。
 - 更新 `package.json` 和網頁資源快取參數至 **v1.7.4**，新增等待室按鈕位置、唯一性與響應式可見性的回歸測試。
 
-**修改檔案**：`public/index.html`、`public/style.css`、`README.md`、`package.json`、`test/ui-layout.test.js`。
+**修改檔案**：`public/index.html`、`public/style.css`、`public/app.js`（僅同步版本識別）、`README.md`、`package.json`、`test/ui-layout.test.js`。
 
 ### v1.7.3｜購地動畫只顯示房子，修復全圖大色塊與縮放異常（2026-11-04）
 
