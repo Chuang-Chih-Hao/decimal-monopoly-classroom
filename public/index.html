@@ -6,12 +6,12 @@
   <meta name="theme-color" content="#f6efe5" />
   <meta name="description" content="六年級小數大富翁：5 位學生與房主同時連線，邊玩邊練習小數、折扣、比價與應用題。" />
   <title>小數富翁探險島｜六年級數學連線大富翁</title>
-  <link rel="stylesheet" href="/style.css?v=1.8.3" />
+  <link rel="stylesheet" href="/style.css?v=1.9.0" />
   <script src="/socket.io/socket.io.js" defer></script>
-  <script src="/board-layout.js?v=1.8.3" defer></script>
-  <script src="/player-colors.js?v=1.8.3" defer></script>
-  <script src="/sound.js?v=1.8.3" defer></script>
-  <script src="/app.js?v=1.8.3" defer></script>
+  <script src="/board-layout.js?v=1.9.0" defer></script>
+  <script src="/player-colors.js?v=1.9.0" defer></script>
+  <script src="/sound.js?v=1.9.0" defer></script>
+  <script src="/app.js?v=1.9.0" defer></script>
 </head>
 <body>
 <div class="app">
@@ -25,6 +25,7 @@
         </label>
         <button id="sound-preview" type="button" class="sound-preview" title="試聽目前音量" aria-label="試聽音效">♫</button>
       </div>
+      <button id="feedback-history-open" type="button" class="btn outline small" hidden>👑 歷史回饋資料庫</button>
       <div id="connection" class="connection"><span class="status-dot"></span>連線中…</div>
     </div>
   </header>
@@ -33,7 +34,7 @@
     <div class="intro-copy">
       <div class="eyebrow">✦ 小數應用主題教室 ✦</div>
       <h1>把小數變成你的<br/><em>致富超能力！</em></h1>
-      <p>擲骰前進、算折扣、拆穿黑心商人，搶購店面挑戰最終 Boss。<br/>30 格經典方格棋盤、雙人快速對決，每一格都藏著新的數學冒險！</p>
+      <p>擲骰前進、算折扣、拆穿黑心商人，搶購店面挑戰最終 Boss。<br/>32 格經典方格棋盤、雙人快速對決，每一格都藏著新的數學冒險！</p>
       <div class="feature-tags"><span>🧮 小數四則</span><span>🏷️ 折扣比價</span><span>🏠 買地收租</span><span>⚔️ 剪刀石頭布</span><span>🐉 兩題 Boss</span></div>
       <div class="entry-decoration">🐈 <span>🦫</span> 🐼</div>
     </div>
@@ -80,8 +81,8 @@
       <div class="play-grid">
         <section class="board-column">
           <div class="section-head"><div><span class="overline">DECIMAL ISLAND</span><h2>小數富翁地圖</h2></div><div class="game-clock-group"><div id="round-chip" class="round-chip">第 1 輪 · ♾️ 無限輪</div><div id="session-clock" class="session-clock">⏱️ 30:00</div></div></div>
-          <div class="track-tools"><span class="track-instruction">🎲 30 格經典方格棋盤 · 依裝置自動適配起始比例，換人不強制放大；可自行縮放、拖曳或滑動</span><div class="track-zoom" aria-label="棋盤視野控制"><button type="button" class="btn outline small" id="map-overview">全覽</button><button type="button" class="btn outline small" id="map-zoom-out" aria-label="縮小棋盤">−</button><span id="map-zoom-label" class="map-zoom-label" aria-live="polite">100%</span><button type="button" class="btn outline small" id="map-zoom-in" aria-label="放大棋盤">＋</button><button type="button" class="btn outline small" id="map-fullsize">🎯 聚焦目前玩家</button></div></div><div id="board-wrapper" class="board-wrapper" aria-label="棋盤可用滑動或拖曳調整位置"><div id="board" class="board" aria-label="大富翁遊戲棋盤"><div id="board-center" class="board-center"></div></div></div>
-          <div class="board-legend"><span><b class="legend-square prop"></b>可購買店面</span><span><b class="legend-square event"></b>答題事件</span><span>🏁 經過起點 +$200</span><span>⚔️ 別人的房產：繳租後雙人加賽</span></div>
+          <div class="track-tools"><span class="track-instruction">🎲 32 格經典方格棋盤 · 依裝置自動適配起始比例，換人不強制放大；可自行縮放、拖曳或滑動</span><div class="track-zoom" aria-label="棋盤視野控制"><button type="button" class="btn outline small" id="map-overview">全覽</button><button type="button" class="btn outline small" id="map-zoom-out" aria-label="縮小棋盤">−</button><span id="map-zoom-label" class="map-zoom-label" aria-live="polite">100%</span><button type="button" class="btn outline small" id="map-zoom-in" aria-label="放大棋盤">＋</button><button type="button" class="btn outline small" id="map-fullsize">🎯 聚焦目前玩家</button></div></div><div id="board-wrapper" class="board-wrapper" aria-label="棋盤可用滑動或拖曳調整位置"><div id="board" class="board" aria-label="大富翁遊戲棋盤"><div id="board-center" class="board-center"></div></div></div>
+          <div class="board-legend"><span><b class="legend-square prop"></b>可購買店面</span><span><b class="legend-square event"></b>答題事件</span><span>🏁 經過起點 +$200</span><span>⚔️ 別人的房產：繳租後雙人加賽</span><span>🚔 監獄：服刑一回合／保釋 $80</span><span>🤝 均付：支付 $120 給其他玩家</span></div>
           <section class="panel history-panel"><h3>📣 冒險紀錄 <small>最新事件置頂</small></h3><div id="history" class="history" aria-live="polite"></div></section>
         </section>
         <aside class="side-column">
@@ -102,11 +103,29 @@
     </section>
 
     <section id="end-screen" class="end-screen panel" hidden>
-      <div class="overline">MISSION COMPLETED</div><div class="end-icon">🏆</div><h2>小數富翁，正式結算！</h2><p>用現金＋房產原價計算總資產，答題數據也一起公開。</p><div id="end-rankings" class="end-rankings"></div><section id="end-achievements" class="end-achievements" aria-label="本局冒險成就"></section><section id="learning-feedback" class="learning-feedback" aria-label="我的錯題和常錯題型分析"></section>
+      <div class="overline">MISSION COMPLETED</div><div class="end-icon">🏆</div><h2 id="end-title">小數富翁，正式結算！</h2><p id="end-reason">用現金＋房產原價計算總資產，答題數據也一起公開。</p><div id="end-rankings" class="end-rankings"></div><section id="end-achievements" class="end-achievements" aria-label="本局冒險成就"></section><section id="learning-feedback" class="learning-feedback" aria-label="我的錯題和常錯題型分析"></section>
       <section class="reflection" aria-label="數學冒險家文字回饋"><h3>🧠 數學冒險家回饋</h3><p>① 哪一題最有挑戰？你怎麼算出來的？<br/>② 比價和打折時，哪個方法最實用？<br/>③ 下次買房或繳租，你會改變什麼策略？</p><label class="reflection-label" for="reflection-input">✍️ 寫下這次的學習心得</label><textarea id="reflection-input" maxlength="600" rows="5" placeholder="例如：我最難的是折扣題，原來 7.5 折要先乘 0.75。下次我會先估算再計算。"></textarea><div class="reflection-actions"><span id="reflection-count" class="reflection-count">0 / 600 字</span><button type="button" id="reflection-save" class="btn primary">📩 送出給房主</button></div><p id="reflection-status" class="reflection-status" role="status">只有你和房主能看到這份文字回饋；送出後仍可修改。</p></section><section id="teacher-reflections" class="teacher-reflections" hidden><h3>👑 房主：學生文字回饋總覽</h3><div id="reflection-list"></div></section>
       <button id="restart-btn" class="btn primary" hidden>🔄 原班人馬，再玩一局</button>
     </section>
   </main>
+  <section id="feedback-history-modal" class="history-modal" role="dialog" aria-modal="true" aria-labelledby="feedback-history-title" hidden>
+    <div class="history-dialog panel">
+      <div class="history-dialog-head">
+        <div><span class="overline">TEACHER ARCHIVE</span><h2 id="feedback-history-title">👑 歷史課堂回饋</h2>
+          <p>僅持有房主金鑰者可查看本帳號的過往結算與學生回饋。</p></div>
+        <button id="feedback-history-close" type="button" class="btn outline small">✕ 關閉</button>
+      </div>
+      <div id="feedback-history-status" role="status" class="history-db-status">正在檢查資料庫…</div>
+      <div class="history-toolbar">
+        <label>搜尋回饋、房號或暱稱<input id="feedback-history-search" type="search" class="text-input" placeholder="例如：折扣／同學暱稱／房間代碼" /></label>
+        <button id="feedback-history-refresh" type="button" class="btn outline small">🔄 重新查詢</button>
+        <button id="feedback-history-copy-key" type="button" class="btn outline small">🔑 備份房主金鑰</button>
+        <button id="feedback-history-import-key" type="button" class="btn outline small">📥 匯入金鑰</button>
+      </div>
+      <p class="history-security-note">房主金鑰等同查閱權限；請勿分享給學生。更換裝置前請先備份，避免無法查看舊資料。</p>
+      <div id="feedback-history-results" class="history-results" aria-live="polite"></div>
+    </div>
+  </section>
   <div id="event-spotlight" class="event-spotlight" role="status" aria-live="polite" aria-atomic="true" hidden></div>
   <div id="toast" class="toast" role="alert" aria-live="assertive" hidden></div>
   <footer class="footer">📚 六年級小數應用教學遊戲 <span>·</span> 答錯也能學會，計算才是超能力！</footer>

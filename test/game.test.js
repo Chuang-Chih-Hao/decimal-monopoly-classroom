@@ -21,9 +21,9 @@ function chooseCorrect(room) {return room.pending.question.correctIndex;}
 function chooseWrong(room) {return (room.pending.question.correctIndex+1)%4;}
 
 test('題庫各類別存在、每題 4 個不同選項，共超過 75 題',()=>{
-  assert.ok(TOTAL>=75,`題庫只有 ${TOTAL} 題`);
+  assert.equal(TOTAL,341,`題庫數量有誤：${TOTAL}`);
   for(const type of ['purchase','calc','discount','compare','scam','chest','chance','fate','boss','rescue']){
-    assert.ok(BANK[type]?.length>=8,`${type} 題數不足`);
+    assert.ok(BANK[type]?.length>=33,`${type} 題數不足`);
     for(const q of BANK[type]) assert.equal(new Set([q.answer,...q.distractors]).size,4,q.id);
   }
 });
@@ -95,6 +95,9 @@ test('租金不足先作救援題，答對有補助，答錯暫停下一輪',()=
     assert.equal(student.cash,0);
     assert.equal(host.cash,correct?935:910);
     assert.equal(student.missedTurns,correct?0:1);
+    assert.equal(room.status,'finished','現金耗盡時須立即結算');
+    assert.equal(room.finishReason,'bankrupt');
+    assert.equal(room.bankruptPlayerId,student.id);
   }
 });
 
@@ -167,8 +170,8 @@ test('80 元打 7.5 折：省下 20 元、售價 60 元的題目解析完整且�
 });
 
 
-test('棋盤剛好 30 格、索引連續且房產價格／租金合法',()=>{
-  assert.equal(BOARD.length,30);
+test('棋盤 32 格、索引連續且房產價格／租金合法',()=>{
+  assert.equal(BOARD.length,32);
   for(let i=0;i<BOARD.length;i++){
     assert.equal(BOARD[i].id,i);
     if(BOARD[i].type==='property'){
@@ -197,7 +200,7 @@ test('每題預設 120 秒、房主可調整至 180 秒，30 分鐘結算上限'
   assert.ok(other.pending.expiresAt-Date.now()>=179000);
 });
 
-test('91 題均有具體情境和完整解析、對比價／折扣關鍵量明確',()=>{
+test('341 題均有具體情境和完整解析、對比價／折扣關鍵量明確',()=>{
   for(const qs of Object.values(BANK))for(const q of qs){
     assert.ok(q.question.length>=33,`${q.id} 題目太短`);
     assert.ok(q.explanation.includes('解題步驟'),`${q.id} 缺解析`);
@@ -941,4 +944,134 @@ test('v1.8.2 機器人仍可自動結束回合，倒數逾時不影響機器人�
   advanceBot(game,room);
   assert.equal(room.currentPlayerId,host.id);
   assert.equal(room.betweenExpiresAt,null);
+});
+
+
+test('v1.9.0 監獄：踩到格子不立刻扣款，下一次輪到時要選服刑或保釋',()=>{
+  const {game,room,host,student}=setup();
+  game.land(room,host,BOARD[30]);
+  assert.equal(room.phase,'between');
+  assert.equal(host.jailed,true);
+  assert.equal(host.cash,900);
+  game.nextTurn(room,host.id);
+  assert.equal(room.currentPlayerId,student.id);
+  game.nextTurn(room,host.id,true);
+  assert.equal(room.currentPlayerId,host.id);
+  assert.equal(room.phase,'jail-choice');
+  assert.ok(room.jailChoiceExpiresAt>Date.now());
+  assert.equal(game.publicState(room,host.id).jailBail,80);
+  game.decideJail(room,host.id,false);
+  assert.equal(room.phase,'between');
+  assert.equal(host.jailed,false);
+  assert.equal(host.bailPurchaseBan,false);
+  assert.equal(host.position,0,'服刑不移動');
+});
+
+test('v1.9.0 保釋：扣除 80 元，當回合不能買房；下回合限制解除',()=>{
+  const {game,room,host,student}=setup();
+  game.land(room,host,BOARD[30]);
+  game.nextTurn(room,host.id);
+  game.nextTurn(room,host.id,true);
+  game.decideJail(room,host.id,true);
+  assert.equal(room.phase,'rolling');
+  assert.equal(host.cash,820);
+  assert.equal(host.bailPurchaseBan,true);
+  game.land(room,host,BOARD[1]);
+  assert.equal(room.phase,'between');
+  assert.equal(room.properties[1],undefined);
+  assert.ok(room.log.some(x=>x.text.includes('前科限制')));
+  game.nextTurn(room,host.id);
+  assert.equal(host.bailPurchaseBan,false);
+  game.nextTurn(room,host.id,true);
+  game.land(room,host,BOARD[1]);
+  assert.equal(room.phase,'answering');
+  game.answer(room,host.id,chooseCorrect(room));
+  assert.equal(room.phase,'buying');
+});
+
+test('v1.9.0 監獄保釋金不足時不得支付；逾時會自動選服刑',()=>{
+  const {game,room,host}=setup();
+  host.cash=60;
+  game.land(room,host,BOARD[30]);
+  game.nextTurn(room,host.id);
+  game.nextTurn(room,host.id,true);
+  assert.throws(()=>game.decideJail(room,host.id,true),GameError);
+  room.jailChoiceExpiresAt=Date.now()-1;
+  game.tick(()=>{});
+  assert.equal(room.phase,'between');
+  assert.equal(host.cash,60);
+  assert.equal(host.jailed,false);
+});
+
+test('v1.9.0 均付：除踩到的人以外，其他玩家均分 120 元且總金錢守恆',()=>{
+  const game=new GameManager();
+  const {room,player:host}=game.newRoom('房主','capybara');
+  const {player:student}=game.join(room.code,'學生','🐈');
+  const {player:third}=game.join(room.code,'第三位','🐕');
+  game.start(room,host.id);
+  const sumBefore=room.players.reduce((n,p)=>n+p.cash,0);
+  game.land(room,host,BOARD[31]);
+  assert.equal(room.phase,'between');
+  assert.equal(host.cash,780);
+  assert.equal(student.cash,960);
+  assert.equal(third.cash,960);
+  assert.equal(room.players.reduce((n,p)=>n+p.cash,0),sumBefore);
+});
+
+test('v1.9.0 均付不足會分配實際現金，付款者破產立即結算',()=>{
+  const {game,room,host,student}=setup();
+  host.cash=50;
+  game.land(room,host,BOARD[31]);
+  assert.equal(host.cash,0);
+  assert.equal(student.cash,950);
+  assert.equal(room.status,'finished');
+  assert.equal(room.finishReason,'bankrupt');
+  assert.equal(room.bankruptPlayerId,host.id);
+  assert.equal(room.rankings.length,2);
+});
+
+test('v1.9.0 稅金、租金與保釋使任何玩家現金歸零時，立刻結算而非等待回合結束',()=>{
+  const {game,room,host}=setup();
+  host.cash=60;
+  game.land(room,host,{type:'tax'});
+  assert.equal(room.status,'finished');
+  assert.equal(room.phase,'finished');
+  assert.equal(room.finishReason,'bankrupt');
+  assert.ok(room.rankings.length>=2);
+  assert.ok(room.log.some(x=>x.text.includes('宣告破產')));
+  assert.throws(()=>game.nextTurn(room,host.id),GameError);
+});
+
+test('v1.9.0 題庫循環後第一題不能等於上一輪最後一題',()=>{
+  const {game,room}=setup();
+  const firstCycle=[];
+  for(let i=0;i<BANK.purchase.length;i++)firstCycle.push(game.takeQuestion(room,'purchase').id);
+  assert.equal(new Set(firstCycle).size,BANK.purchase.length);
+  const next=game.takeQuestion(room,'purchase');
+  assert.notEqual(next.id,firstCycle.at(-1));
+  assert.equal(TOTAL,341);
+  for(const [kind,items] of Object.entries(BANK)){
+    assert.ok(items.length>=33,kind);
+    assert.equal(new Set(items.map(x=>x.id)).size,items.length);
+    for(const q of items)assert.equal(new Set([q.answer,...q.distractors]).size,4,q.id);
+  }
+});
+
+test('v1.9.0 機器人監獄選擇可以自動進行，不會卡住真人回合',()=>{
+  const game=new GameManager();
+  const {room,player:host}=game.newRoom('房主','capybara');
+  const bot=game.addBot(room,host.id);
+  game.start(room,host.id);
+  game.nextTurn(room,host.id,true);
+  game.land(room,bot,BOARD[30]);
+  assert.equal(bot.jailed,true);
+  game.nextTurn(room,bot.id);
+  game.nextTurn(room,host.id,true);
+  assert.equal(room.currentPlayerId,bot.id);
+  assert.equal(room.phase,'jail-choice');
+  const previous=Math.random;Math.random=()=>0;
+  try{advanceBot(game,room);}finally{Math.random=previous;}
+  assert.equal(room.phase,'rolling');
+  assert.equal(bot.cash,820);
+  assert.equal(bot.bailPurchaseBan,true);
 });

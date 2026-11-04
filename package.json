@@ -1,6 +1,6 @@
 {
   "name": "decimal-monopoly-classroom",
-  "version": "1.8.3",
+  "version": "1.9.0",
   "description": "國小六年級｜小數大富翁：最多 5 位學生 + 1 位房主的即時連線數學遊戲",
   "type": "commonjs",
   "main": "server.js",
@@ -14,7 +14,8 @@
   },
   "dependencies": {
     "express": "^4.21.2",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.1",
+    "pg": "^8.16.3"
   },
   "devDependencies": {
     "socket.io-client": "^4.8.1"

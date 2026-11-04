@@ -8,6 +8,9 @@ const MAX_PEOPLE = 6; // 一位房主 + 最多五位真人／機器人
 const QUESTION_SECONDS = 120; // 六年級學生預設有兩分鐘計算時間
 const DUEL_SECONDS = 25; // 猜拳出招倒數
 const BETWEEN_SECONDS = 60; // 完成回合後最多等待一分鐘，逾時自動換下一位
+const JAIL_BAIL = 80; // 保釋金
+const SHARE_TOTAL = 120; // 均付格：由踩到的人支付並平分給其他玩家
+const JAIL_CHOICE_SECONDS = 60; // 獄中玩家逾時自動服刑
 const GAME_MINUTES = 30;
 const LOBBY_DEFAULTS = Object.freeze({rounds:'unlimited',money:900,questionSeconds:120,durationMinutes:30});
 const MAX_REFLECTION_LENGTH = 600;
@@ -87,8 +90,9 @@ function requireTurn(room, playerId) {
 }
 function changeCash(player, delta) {
   const old = player.cash;
-  player.cash = Math.max(0, old + delta);
-  return player.cash - old;
+  player.cash = Math.max(0,old+delta);
+  if(old>0 && delta<0 && player.cash===0)player.bankrupt=true;
+  return player.cash-old;
 }
 
 class GameManager {
@@ -109,7 +113,8 @@ class GameManager {
       questionSeconds:QUESTION_SECONDS,durationMinutes:GAME_MINUTES,endsAt:null,bonusStage:0,
       settings:{...LOBBY_DEFAULTS},
       duel:null,lastDuel:null,poll:null,lastPoll:null,lastAchievement:null,
-      board: BOARD, properties:{}, pending:null, phase:'lobby',botAction:null,betweenExpiresAt:null,
+      board: BOARD, properties:{}, pending:null, phase:'lobby',botAction:null,betweenExpiresAt:null,jailChoiceExpiresAt:null,
+      finishReason:null,bankruptPlayerId:null,lastQuestionIds:{},
       lastRoll:null, lastResult:null, log:[], questionQueues:{},
       updatedAt:Date.now(), createdAt:Date.now(), rankings:[]
     };
@@ -133,6 +138,7 @@ class GameManager {
   makePlayer(name, animal, host=false, isBot=false) {
     return { id:randomUUID(), token:isBot?null:randomBytes(24).toString('hex'), name, animal,
       host, isBot, connected:true, socketId:null, cash:0, properties:[], position:0,
+      jailed:false,bailPurchaseBan:false,bankrupt:false,
       missedTurns:0, correct:0, attempted:0, answerHistory:[],reflection:null,
        achievements:[],titleId:null,spectatorCorrect:0,spectatorAttempted:0 };
   }
@@ -204,6 +210,8 @@ class GameManager {
     if(room.phase==='buying'&&room.pending?.type==='buying')return {
       key:`buy:${tag}:${room.pending.tileId}`,
       act:()=>this.decideBuy(room,actor.id,Math.random()<.85)};
+    if(room.phase==='jail-choice')return {key:`jail:${tag}:${room.jailChoiceExpiresAt}`,delayMs:2400,
+      act:()=>this.decideJail(room,actor.id,actor.cash>=JAIL_BAIL&&Math.random()<.7)};
     if(room.phase==='between')return {key:`next:${tag}:${room.lastRoll?.id||'none'}`,
       act:()=>this.nextTurn(room,actor.id)};
     return null;
@@ -288,8 +296,9 @@ class GameManager {
     room.bonusStage=0;room.duel=null;room.lastDuel=null;room.poll=null;room.lastPoll=null;room.lastAchievement=null;
     room.turnIndex=0; room.currentPlayerId=room.players[0].id;
     room.properties={}; room.pending=null; room.lastRoll=null; room.lastResult=null;
-    room.questionQueues={}; room.rankings=[];room.botAction=null;room.betweenExpiresAt=null;
-    room.players.forEach(p=>{p.cash=money;p.properties=[];p.position=0;p.correct=0;p.attempted=0;p.answerHistory=[];p.reflection=null;p.missedTurns=0;p.achievements=[];p.titleId=null;p.spectatorCorrect=0;p.spectatorAttempted=0;});
+    room.questionQueues={};room.lastQuestionIds={};room.rankings=[];room.botAction=null;room.betweenExpiresAt=null;
+    room.jailChoiceExpiresAt=null;room.finishReason=null;room.bankruptPlayerId=null;
+    room.players.forEach(p=>{p.cash=money;p.properties=[];p.position=0;p.correct=0;p.attempted=0;p.answerHistory=[];p.reflection=null;p.missedTurns=0;p.jailed=false;p.bailPurchaseBan=false;p.bankrupt=false;p.achievements=[];p.titleId=null;p.spectatorCorrect=0;p.spectatorAttempted=0;});
     message(room, `🎉 遊戲開始！每人獲得 $${money}，每題 ${questionSeconds} 秒，${unlimited?'無輪數上限':'最多 '+limit+' 輪'}，${durationMinutes} 分鐘後結算（房主也可提前結束）。${room.players[0].name} 先擲骰。`);
   }
 
@@ -374,8 +383,15 @@ class GameManager {
     const pool=BANK[kind];
     if (!pool || !pool.length) throw new Error(`Missing question type: ${kind}`);
     const queue = room.questionQueues[kind] ??= [];
-    if (queue.length === 0) queue.push(...shuffle(pool.map(q=>q.id)));
+    if(queue.length===0){
+      const next=shuffle(pool.map(q=>q.id));
+      // 一整輪題目用完重新洗牌時，不能立刻重複上一題。
+      const previous=room.lastQuestionIds?.[kind];
+      if(next.length>1&&next[0]===previous)[next[0],next[1]]=[next[1],next[0]];
+      queue.push(...next);
+    }
     const id=queue.shift();
+    (room.lastQuestionIds??={})[kind]=id;
     const chosen=pool.find(q=>q.id===id);
     const answers=shuffle([chosen.answer,...chosen.distractors]);
     return { id, kind, text:chosen.question, options:answers,
@@ -384,6 +400,7 @@ class GameManager {
   }
 
   ask(room,kind,context={},opts={}) {
+    if(this.checkBankruptcy(room))return;
     const question=this.takeQuestion(room,kind);
     room.pending={
       type:kind, question, context,
@@ -416,10 +433,21 @@ class GameManager {
   }
 
   land(room,player,tile) {
+    if(this.checkBankruptcy(room))return;
     const type=tile.type;
+    if(type==='jail'){
+      player.jailed=true;
+      message(room,`🚔 ${player.name} 進入冒險監獄！下次輪到時可服刑一回合，或支付 ${JAIL_BAIL} 保釋，但當回合不能買房。`);
+      this.beginBetween(room);return;
+    }
+    if(type==='share'){this.sharePayment(room,player);return;}
     if (type==='property') {
       const ownerId=room.properties[tile.id];
       if (!ownerId) {
+        if(player.bailPurchaseBan){
+          message(room,`🚫 ${player.name} 本回合付保釋金出獄，因前科限制不能購買「${tile.name}」。`);
+          this.beginBetween(room);return;
+        }
         if (player.cash < tile.price) {
           message(room, `💰 ${player.name} 的 $${player.cash} 不夠購買「${tile.name}」（$${tile.price}）。`);
           this.beginBetween(room); return;
@@ -567,12 +595,57 @@ class GameManager {
   }
 
   beginBetween(room) {
+    if(this.checkBankruptcy(room))return;
     room.phase='between';
     room.betweenExpiresAt=Date.now()+BETWEEN_SECONDS*1000;
   }
 
+  // 每一次付費後立即判定現金是否歸零；即使尚有房產也立即結算。
+  checkBankruptcy(room) {
+    if(room.status!=='playing')return false;
+    const bankrupt=room.players.find(p=>p.bankrupt || (p.cash===0 && room.startMoney>0));
+    if(!bankrupt)return false;
+    room.finishReason='bankrupt';
+    room.bankruptPlayerId=bankrupt.id;
+    message(room,`💸 ${bankrupt.name} 現金歸零，宣告破產！遊戲立即結算所有玩家的現金與房產。`);
+    this.finish(room);
+    return true;
+  }
+
+  // 均付站：踏入者是付款者，總額 120 元（不足時支付剩餘現金），
+  // 使用整數金額平均分給其他玩家；餘額按玩家順序分配，不憑空造錢。
+  sharePayment(room,payer) {
+    const others=room.players.filter(p=>p.id!==payer.id);
+    const amount=Math.min(SHARE_TOTAL,payer.cash);
+    if(!others.length || amount<=0){this.beginBetween(room);return;}
+    const paid=-changeCash(payer,-amount);
+    const each=Math.floor(paid/others.length),extra=paid%others.length;
+    for(let i=0;i<others.length;i++)changeCash(others[i],each+(i<extra?1:0));
+    message(room,`🤝 ${payer.name} 在均付分享站支出 ${paid}，由其他 ${others.length} 位玩家均分（每人至少 ${each}）。`);
+    this.beginBetween(room);
+  }
+
+  decideJail(room,playerId,payBail=false) {
+    const player=requireTurn(room,playerId);
+    if(room.phase!=='jail-choice'||!player.jailed)throw new GameError('目前沒有等待選擇的監獄事件。');
+    if(payBail){
+      if(player.cash<JAIL_BAIL)throw new GameError('現金不足，無法支付保釋金，請服刑一回合。');
+      changeCash(player,-JAIL_BAIL);
+      player.jailed=false;player.bailPurchaseBan=true;room.jailChoiceExpiresAt=null;
+      message(room,`🚔 ${player.name} 支付 ${JAIL_BAIL} 保釋出獄；本回合留有前科，不可以購買新房產。`);
+      if(this.checkBankruptcy(room))return;
+      room.phase='rolling';
+      return;
+    }
+    player.jailed=false;player.bailPurchaseBan=false;room.jailChoiceExpiresAt=null;
+    message(room,`🔒 ${player.name} 服刑一回合，這次不擲骰；下次輪到時恢復自由。`);
+    this.beginBetween(room);
+    // 服刑視為一次完整回合，沿用原本 60 秒可手動／自動換人規則。
+  }
+
   // 屋主與租客同步出招；出手結果先藏在伺服器，兩人出招後才揭露。
   beginDuel(room,renter,owner,tile) {
+    if(this.checkBankruptcy(room))return;
     if(!owner.connected || !renter.connected) {
       message(room, `🛜 ${owner.connected?'租客':'屋主'}暫時離線，本次只付原過路費、免加賽。`);
       room.duel=null;this.beginBetween(room);return;
@@ -639,6 +712,7 @@ class GameManager {
 
   decideBuy(room,playerId,buy) {
     const player=requireTurn(room,playerId);
+    if(player.bailPurchaseBan&&buy)throw new GameError('本回合保釋出獄，有前科，不能購買房產。');
     if(room.phase!=='buying'||room.pending?.type!=='buying') throw new GameError('沒有正在等待購地決定的房產。');
     const tile=BOARD[room.pending.tileId];
     if(buy) {
@@ -666,7 +740,14 @@ class GameManager {
     if(hostOverride && room.phase==='buying') room.pending=null;
     if(hostOverride && room.phase==='duel') {room.duel=null;message(room,'⏭️ 房主略過雙人對戰，本次不額外轉帳。');}
     if(hostOverride && room.phase==='rolling') message(room,'⏭️ 房主跳過本次擲骰。');
-    room.pending=null;room.poll=null;
+    if(hostOverride && room.phase==='jail-choice') {
+      room.players.find(p=>p.id===room.currentPlayerId).jailed=false;
+      room.jailChoiceExpiresAt=null;
+      message(room,'⏭️ 房主略過獄中回合，視為服刑結束。');
+    }
+    room.pending=null;room.poll=null;room.jailChoiceExpiresAt=null;
+    if(this.checkBankruptcy(room))return;
+    room.players.find(p=>p.id===room.currentPlayerId).bailPurchaseBan=false;
     room.phase='rolling';room.betweenExpiresAt=null;
     if(room.endsAt && Date.now()>=room.endsAt){this.finish(room);return;}
     room.turnIndex++;
@@ -687,6 +768,12 @@ class GameManager {
       room.currentPlayerId=room.players[room.turnIndex].id;
       safety++;
     }
+    const arriving=room.players[room.turnIndex];
+    if(arriving?.jailed){
+      room.phase='jail-choice';
+      room.jailChoiceExpiresAt=Date.now()+JAIL_CHOICE_SECONDS*1000;
+      message(room,`🚔 輪到 ${arriving.name}：請選擇服刑一回合，或付 ${JAIL_BAIL} 保釋出獄（本回合禁止購地）。`);
+    }
     message(room, `🎯 第 ${room.round} ${room.roundLimit===null?'輪（無輪數上限）':'/ '+room.roundLimit+' 輪'}：輪到 ${room.players[room.turnIndex].name}！`);
   }
 
@@ -706,7 +793,7 @@ class GameManager {
 
   finish(room) {
     room.status='finished';room.phase='finished';room.currentPlayerId=null;
-    room.pending=null;room.duel=null;room.poll=null;room.botAction=null;room.betweenExpiresAt=null;
+    room.pending=null;room.duel=null;room.poll=null;room.botAction=null;room.betweenExpiresAt=null;room.jailChoiceExpiresAt=null;
     room.rankings=room.players.map(p=>({id:p.id,name:p.name,animal:p.animal,
       cash:p.cash,landValue:p.properties.reduce((v,id)=>v+BOARD[id].price,0),
       score:p.cash+p.properties.reduce((v,id)=>v+BOARD[id].price,0),
@@ -724,9 +811,9 @@ class GameManager {
     requireHost(room,hostId);
     if(room.status!=='finished') throw new GameError('請先結束這一局。');
     room.status='lobby';room.phase='lobby';room.currentPlayerId=null;
-    room.round=1;room.rankings=[];room.pending=null;room.properties={};room.botAction=null;room.betweenExpiresAt=null;
+    room.round=1;room.rankings=[];room.pending=null;room.properties={};room.botAction=null;room.betweenExpiresAt=null;room.jailChoiceExpiresAt=null;room.finishReason=null;room.bankruptPlayerId=null;room.lastQuestionIds={};
     room.lastRoll=null;room.lastResult=null;room.duel=null;room.lastDuel=null;room.endsAt=null;room.bonusStage=0;room.questionQueues={};room.poll=null;room.lastPoll=null;room.lastAchievement=null;
-    room.players.forEach(p=>{p.cash=0;p.properties=[];p.position=0;p.missedTurns=0;p.correct=0;p.attempted=0;p.answerHistory=[];p.reflection=null;p.achievements=[];p.titleId=null;p.spectatorCorrect=0;p.spectatorAttempted=0;});
+    room.players.forEach(p=>{p.cash=0;p.properties=[];p.position=0;p.missedTurns=0;p.correct=0;p.attempted=0;p.answerHistory=[];p.reflection=null;p.achievements=[];p.titleId=null;p.jailed=false;p.bailPurchaseBan=false;p.bankrupt=false;p.spectatorCorrect=0;p.spectatorAttempted=0;});
     message(room,'🔁 房主已開啟下一局，所有玩家保留座位。');
   }
 
@@ -739,9 +826,12 @@ class GameManager {
       roundLimit:room.roundLimit,startMoney:room.startMoney,currentPlayerId:room.currentPlayerId,
       durationMinutes:room.durationMinutes,endsAt:room.endsAt,questionSeconds:room.questionSeconds,bonusStage:room.bonusStage,
       betweenExpiresAt:room.phase==='between'?room.betweenExpiresAt:null,
+      jailChoiceExpiresAt:room.phase==='jail-choice'?room.jailChoiceExpiresAt:null,
+      jailBail:JAIL_BAIL,shareTotal:SHARE_TOTAL,finishReason:room.finishReason||null,
+      bankruptPlayerId:room.bankruptPlayerId||null,
       players:room.players.map(p=>({id:p.id,name:p.name,animal:p.animal,host:p.host,isBot:!!p.isBot,
         connected:p.connected,cash:p.cash,properties:p.properties,position:p.position,
-        missedTurns:p.missedTurns,correct:p.correct,attempted:p.attempted,
+        missedTurns:p.missedTurns,jailed:!!p.jailed,bailPurchaseBan:!!p.bailPurchaseBan,bankrupt:!!p.bankrupt,correct:p.correct,attempted:p.attempted,
         achievements:[...p.achievements],titleId:p.titleId})),
       achievementCatalog:ACHIEVEMENTS,lastAchievement:room.lastAchievement,
       mySpectatorScore:(()=>{const mine=room.players.find(p=>p.id===viewerId);return mine?{correct:mine.spectatorCorrect,attempted:mine.spectatorAttempted}:null;})(),
@@ -786,6 +876,10 @@ class GameManager {
         message(room,step===1?'✨ 中場加碼！之後數學挑戰答對額外獎勵 $15。':'🚀 最後衝刺！數學挑戰答對額外獎勵 $30，小遊戲補貼上限提高到 $60。');
         changed=true;
       }
+      if(room.phase==='jail-choice'&&room.jailChoiceExpiresAt<=now){
+        this.decideJail(room,room.currentPlayerId,false);changed=true;
+      }
+      if(room.status!=='playing'){if(changed)onChange(room);continue;}
       if(room.phase==='story'&&room.pending?.expiresAt<=now){
         this.chooseStory(room,room.currentPlayerId,'safe',true);changed=true;
       }

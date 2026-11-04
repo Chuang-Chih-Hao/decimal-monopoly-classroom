@@ -30,6 +30,8 @@ const BOARD = [
   { id:27,type:'property',name:'海洋樂園',icon:'🐬',price:420,rent:105,group:'藍色' },
   { id:28,type:'boss',name:'逆轉大魔王',icon:'👾',tip:'終盤兩題挑戰' },
   { id:29,type:'fate',name:'命運大轉盤',icon:'🎡',tip:'意外驚喜事件' },
+  { id:30,type:'jail',name:'冒險監獄',icon:'🚔',tip:'下回合服刑 1 次，或付 $80 保釋；保釋回合不能購地' },
+  { id:31,type:'share',name:'均付分享站',icon:'🤝',tip:'踩到的人支付 $120，均分給其他所有玩家' },
 ];
 const ANIMALS = ['capybara','🐈','🐕','🐰','🦊','🐼','🐸','🐧','🦁','🐢','🐹','🦉'];
 module.exports={ BOARD, ANIMALS };

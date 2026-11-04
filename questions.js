@@ -277,5 +277,133 @@ for (const [kind,questions] of Object.entries(BANK)) {
     question.skill=skill;
   });
 }
+
+// v1.9.0：新增 250 道生活情境變化題。所有數值、選項、答案與解析由固定公式建立，
+// 伺服器直接驗證，避免填寫錯誤答案；每類增加 25 題，總量由 91 增為 341 題。
+const round2=n=>Math.round((n+Number.EPSILON)*100)/100;
+const nice=n=>String(round2(n));
+const contexts=['校園園遊會','便利商店','戶外教學','運動會','社團活動','班級義賣','旅行補給','圖書週'];
+function moreNumber(kind,skill,prompt,answer,formula,unit=' 元'){
+  const num=round2(answer);
+  const display=nice(num)+unit;
+  const wrongNumbers=[round2(num+Math.max(1,round2(Math.abs(num)*.1))),
+    round2(Math.max(0,num-Math.max(1,round2(Math.abs(num)*.15)))),
+    round2(num*10),round2(num/10),round2(num+5),round2(num+2.5)];
+  const distractors=[...new Set(wrongNumbers.map(n=>nice(n)+unit))].filter(x=>x!==display).slice(0,3);
+  if(distractors.length!==3)throw new Error('題目選項不足：'+kind+' '+prompt);
+  const id=kind+'-'+(BANK[kind].length+1);
+  const explanation='解題步驟：'+formula+'。解題提醒：先確認題目問的是金額、數量或單位，再依正確運算順序計算並檢查小數點。';
+  BANK[kind].push({id,type:kind,question:prompt,answer:display,distractors,explanation,skill});
+}
+function moreCompare(prompt,unitA,unitB,amountA,amountB){
+  const answer=unitA<unitB?'甲店':'乙店',kind='compare';
+  const id=kind+'-'+(BANK[kind].length+1);
+  BANK[kind].push({id,type:kind,question:prompt,answer,
+    distractors:[answer==='甲店'?'乙店':'甲店','兩店一樣便宜','無法比較'],
+    explanation:'解題步驟：甲店 '+nice(amountA)+' 元，乙店 '+nice(amountB)+' 元；比較相同單位的單價：'+nice(unitA)+' 元與 '+nice(unitB)+' 元，所以選 '+answer+'。解題提醒：不要只看總價，要先統一數量和單位比較。',
+    skill:'unit'});
+}
+for(let i=0;i<25;i++){
+  const scene=contexts[i%contexts.length],cycle=i%5,n=i+1;
+  const price=round2(9.5+n*1.25),qty=2+(i%5),unit=round2(8.5+n*.75);
+  const total=round2(price*qty);
+  // 購地：總價、單價、找零、重量、部分優惠
+  if(cycle===0)moreNumber('purchase','multiply',
+    scene+'中，文具攤每份小禮物 '+nice(price)+' 元，小組一次購買 '+qty+' 份，同款同價且沒有折扣。請問總共需要多少元？',
+    total,nice(price)+' × '+qty+' = '+nice(total));
+  if(cycle===1)moreNumber('purchase','unit',
+    scene+'採購中，同款商品 '+qty+' 件共付 '+nice(round2(unit*qty))+' 元，每件價格相同，也沒有其他費用。請問平均每件售價是多少元？',
+    unit,nice(round2(unit*qty))+' ÷ '+qty+' = '+nice(unit));
+  if(cycle===2)moreNumber('purchase','multi',
+    scene+'準備 '+qty+' 份禮物，每份 '+nice(price)+' 元，另外要支付運送費 '+nice(5+n*.5)+' 元。請問總支出是多少元？',
+    round2(total+5+n*.5),nice(price)+' × '+qty+' + '+nice(5+n*.5)+' = '+nice(round2(total+5+n*.5)));
+  if(cycle===3)moreNumber('purchase','multiply',
+    scene+'需要 '+nice(round2(.5+qty*.25))+' 公斤果乾，每公斤售價 '+nice(36+n*1.5)+' 元，依重量計價。請問需要付多少元？',
+    round2((.5+qty*.25)*(36+n*1.5)),nice(round2(.5+qty*.25))+' × '+nice(36+n*1.5)+' = '+nice(round2((.5+qty*.25)*(36+n*1.5))));
+  if(cycle===4)moreNumber('purchase','addsub',
+    scene+'帶了 '+nice(total+60)+' 元，花掉 '+nice(total)+' 元購買學用品，沒有其他支出。請問剩下多少元？',
+    60,nice(total+60)+' − '+nice(total)+' = 60');
+  // 小數計算：加減乘除和先乘後加
+  const a=round2(2.4+n*.35),b=round2(.6+(i%4)*.25);
+  if(cycle===0)moreNumber('calc','addsub',scene+'在秤重時記下 '+nice(a)+' 公斤與 '+nice(b)+' 公斤兩筆重量。把它們相加後，總重量是多少公斤？',
+    round2(a+b),nice(a)+' + '+nice(b)+' = '+nice(round2(a+b)),' 公斤');
+  if(cycle===1)moreNumber('calc','addsub',scene+'有 '+nice(a+3)+' 公升的飲料，已經倒出 '+nice(a)+' 公升。請用小數減法計算還剩多少公升？',
+    3,nice(a+3)+' − '+nice(a)+' = 3',' 公升');
+  if(cycle===2)moreNumber('calc','multiply',scene+'每包點心重 '+nice(b)+' 公斤，連續拿取 '+qty+' 包相同點心。請用小數乘法算出總共幾公斤？',
+    round2(b*qty),nice(b)+' × '+qty+' = '+nice(round2(b*qty)),' 公斤');
+  if(cycle===3)moreNumber('calc','divide',scene+'要把 '+nice(round2(a*qty))+' 公升果汁平分成 '+qty+' 瓶，每瓶裝相同容量。每瓶應裝多少公升？',
+    a,nice(round2(a*qty))+' ÷ '+qty+' = '+nice(a),' 公升');
+  if(cycle===4)moreNumber('calc','multi',scene+'有 '+qty+' 盒餅乾，每盒 '+nice(b)+' 公斤，另外再拿 '+nice(a)+' 公斤。請先計算盒裝重量再加上散裝重量，總共是多少公斤？',
+    round2(qty*b+a),qty+' × '+nice(b)+' + '+nice(a)+' = '+nice(round2(qty*b+a)),' 公斤');
+  // 折扣：售價、節省金額、兩件促銷、折後再減
+  const original=100+20*n,rate=[.8,.9,.75,.85,.6][cycle],sale=round2(original*rate);
+  if(cycle===0||cycle===2)moreNumber('discount','discount',scene+'的商品原價 '+original+' 元，現在打 '+nice(rate*10)+' 折，意思是只付原價的 '+nice(rate*100)+'%。請問實際應付多少元？',
+    sale,original+' × '+nice(rate)+' = '+nice(sale));
+  if(cycle===1)moreNumber('discount','discount',scene+'的商品原價 '+original+' 元，打 '+nice(rate*10)+' 折。題目問的是比原價省下的金額，而不是售價。請問省下多少元？',
+    round2(original-sale),original+' − '+nice(sale)+' = '+nice(round2(original-sale)));
+  if(cycle===3)moreNumber('discount','multi',scene+'購物時商品原價 '+original+' 元，先打 '+nice(rate*10)+' 折，再使用 '+(5+n)+' 元折價券。請問最終需付多少元？',
+    round2(sale-(5+n)),original+' × '+nice(rate)+' − '+(5+n)+' = '+nice(round2(sale-(5+n))));
+  if(cycle===4)moreNumber('discount','discount',scene+'同款商品每件原價 '+original+' 元，買兩件時第二件打 '+nice(rate*10)+' 折，第一件仍付原價。請問兩件共付多少元？',
+    original+sale,original+' + '+original+' × '+nice(rate)+' = '+nice(original+sale));
+  // 比價：同樣份量下的單價比較
+  const ua=round2(18+(n%8)*1.25),ub=round2(ua+(i%2===0?2:-2));
+  const qa=2+(i%3),qb=3+(i%4);
+  moreCompare(scene+'購買相同品質的同款餅乾，甲店 '+qa+' 包共 '+nice(ua*qa)+' 元；乙店 '+qb+' 包共 '+nice(ub*qb)+' 元。換算每包單價後，哪一家比較便宜？',ua,ub,round2(ua*qa),round2(ub*qb));
+  // 商人陷阱：找出被誤導的價格，依折數、加總、平均單價
+  const claimed=round2(total+8+n*.5);
+  if(cycle===0||cycle===3)moreNumber('scam','multiply',scene+'商人說每份 '+nice(price)+' 元、共 '+qty+' 份，應付 '+nice(claimed)+' 元。請檢查乘法算式，正確應付金額是多少元？',
+    total,nice(price)+' × '+qty+' = '+nice(total)+'（不是 '+nice(claimed)+'）');
+  if(cycle===1||cycle===4)moreNumber('scam','discount',scene+'商品原價 '+original+' 元，打 '+nice(rate*10)+' 折後商人仍要收 '+nice(sale+15)+' 元。請問真正的折後售價應是多少元？',
+    sale,original+' × '+nice(rate)+' = '+nice(sale));
+  if(cycle===2)moreNumber('scam','unit',scene+'同款用品 '+qty+' 件共 '+nice(round2(unit*qty))+' 元，商人說每件 '+nice(unit+3)+' 元。請用除法重新核對，每件正確單價是多少元？',
+    unit,nice(round2(unit*qty))+' ÷ '+qty+' = '+nice(unit));
+  // 寶箱：小數密碼（無貨幣單位）
+  const base=round2(1.25+n*.15),mult=2+(i%5),secret=round2(base*mult);
+  if(cycle===0||cycle===3)moreNumber('chest','multiply','神祕寶箱的密碼是一道小數乘法：'+nice(base)+' × '+mult+'。請計算正確答案才能解鎖，密碼應是多少？',
+    secret,nice(base)+' × '+mult+' = '+nice(secret),'');
+  if(cycle===1)moreNumber('chest','divide','尋寶隊發現一串密碼 '+nice(secret)+' ÷ '+mult+'，要把小數平均分成相同份數。請問解鎖數值是多少？',
+    base,nice(secret)+' ÷ '+mult+' = '+nice(base),'');
+  if(cycle===2)moreNumber('chest','addsub','藏寶圖要求把 '+nice(base)+' 和 '+nice(secret)+' 兩個小數相加，算出下一道密碼。請問正確結果是多少？',
+    round2(base+secret),nice(base)+' + '+nice(secret)+' = '+nice(round2(base+secret)),'');
+  if(cycle===4)moreNumber('chest','addsub','森林寶箱要計算 '+nice(secret+base)+' 減去 '+nice(base)+' 的差，作為鎖頭密碼。請問應輸入多少？',
+    secret,nice(secret+base)+' − '+nice(base)+' = '+nice(secret),'');
+  // 機會：生活中意外出現的折價券、購物、找零
+  if(cycle===0||cycle===3)moreNumber('chance','addsub',scene+'幸運抽到購物券，付給店家 '+nice(total+80)+' 元，商品總價 '+nice(total)+' 元。請問店家應找回多少元？',
+    80,nice(total+80)+' − '+nice(total)+' = 80');
+  if(cycle===1)moreNumber('chance','multiply',scene+'意外得到團購機會，每盒餅乾 '+nice(price)+' 元，買 '+qty+' 盒沒有額外費用。總共應付多少元？',
+    total,nice(price)+' × '+qty+' = '+nice(total));
+  if(cycle===2)moreNumber('chance','unit',scene+'商店有 '+qty+' 張票共賣 '+nice(round2(unit*qty))+' 元，假設同票同價。請問每張平均多少元？',
+    unit,nice(round2(unit*qty))+' ÷ '+qty+' = '+nice(unit));
+  if(cycle===4)moreNumber('chance','discount',scene+'撿到優惠券！原價 '+original+' 元的物品打 '+nice(rate*10)+' 折，也就是付原價的 '+nice(rate*100)+'%。請問售價多少元？',
+    sale,original+' × '+nice(rate)+' = '+nice(sale));
+  // 命運：天氣、交通及突發事件
+  if(cycle===0||cycle===4)moreNumber('fate','multiply',scene+'突然下雨要買雨衣，每件 '+nice(price)+' 元，需要 '+qty+' 件，沒有折扣。請問總支出是多少元？',
+    total,nice(price)+' × '+qty+' = '+nice(total));
+  if(cycle===1)moreNumber('fate','addsub',scene+'交通卡原有 '+nice(total+50)+' 元，因臨時改道花掉 '+nice(total)+' 元。請問卡片餘額還有多少元？',
+    50,nice(total+50)+' − '+nice(total)+' = 50');
+  if(cycle===2)moreNumber('fate','multi',scene+'學校臨時增加 '+qty+' 位參加者，每人餐費 '+nice(price)+' 元，再支付服務費 '+(8+n)+' 元。請問總共需要多少元？',
+    round2(total+8+n),nice(price)+' × '+qty+' + '+(8+n)+' = '+nice(round2(total+8+n)));
+  if(cycle===3)moreNumber('fate','divide',scene+'補給隊臨時需要 '+qty+' 瓶水，總共 '+nice(round2(unit*qty))+' 公升，假設每瓶一樣多。請問每瓶水是多少公升？',
+    unit,nice(round2(unit*qty))+' ÷ '+qty+' = '+nice(unit),' 公升');
+  // Boss：乘加減與折扣的兩步驟
+  if(cycle===0||cycle===3)moreNumber('boss','multi','Boss 綜合題：'+scene+'要買 '+qty+' 份材料，每份 '+nice(price)+' 元，另外加運費 '+(11+n)+' 元。請問總付款金額是多少元？',
+    round2(total+11+n),nice(price)+' × '+qty+' + '+(11+n)+' = '+nice(round2(total+11+n)));
+  if(cycle===1)moreNumber('boss','multi','Boss 綜合題：'+scene+'的商品原價 '+original+' 元，先打 '+nice(rate*10)+' 折，再扣 '+(7+n)+' 元優惠金。請問最後要付多少元？',
+    round2(sale-(7+n)),original+' × '+nice(rate)+' − '+(7+n)+' = '+nice(round2(sale-(7+n))));
+  if(cycle===2)moreNumber('boss','multi','Boss 綜合題：'+scene+'拿 '+nice(total+120)+' 元買 '+qty+' 件商品，每件 '+nice(price)+' 元。請先算總價再求找零，最後剩多少元？',
+    120,nice(total+120)+' − '+nice(price)+' × '+qty+' = 120');
+  if(cycle===4)moreNumber('boss','multi','Boss 綜合題：'+scene+'買 '+qty+' 件商品，每件 '+nice(price)+' 元，再用 '+(8+n)+' 元折價券。請問實際應付多少元？',
+    round2(total-(8+n)),nice(price)+' × '+qty+' − '+(8+n)+' = '+nice(round2(total-(8+n))));
+  // 救援：補足缺額、付款找零、平均單價
+  if(cycle===0||cycle===4)moreNumber('rescue','addsub',scene+'需要緊急補助 '+nice(total+50)+' 元，目前只剩 '+nice(total)+' 元，請先算出還缺多少元才能完成付款？',
+    50,nice(total+50)+' − '+nice(total)+' = 50');
+  if(cycle===1)moreNumber('rescue','unit',scene+'需要分攤費用，總共 '+nice(round2(unit*qty))+' 元由 '+qty+' 人平均支付。每人應付多少元？',
+    unit,nice(round2(unit*qty))+' ÷ '+qty+' = '+nice(unit));
+  if(cycle===2)moreNumber('rescue','multiply',scene+'緊急採購 '+qty+' 件用品，每件 '+nice(price)+' 元，沒有折扣。請計算總共需要多少元才能完成救援？',
+    total,nice(price)+' × '+qty+' = '+nice(total));
+  if(cycle===3)moreNumber('rescue','discount',scene+'緊急救援時，必需品原價 '+original+' 元，打 '+nice(rate*10)+' 折可以省一些錢。請問折扣後的實際付款是多少元？',
+    sale,original+' × '+nice(rate)+' = '+nice(sale));
+}
+
 const TOTAL = Object.values(BANK).reduce((sum, list) => sum + list.length, 0);
 module.exports = { BANK, TOTAL, SKILLS };

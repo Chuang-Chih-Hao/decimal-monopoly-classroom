@@ -82,7 +82,9 @@
         case 'landing':{
           const type=detail.type||'';
           const id=Number(detail.tileId);
-          if(type==='fate'){sequence([300,450,385,600],'sine',.095,.27);}
+          if(type==='jail'){sequence([430,320,220],'sawtooth',.12,.22);}
+          else if(type==='share'){sequence([520,690,580,740],'triangle',.09,.23);}
+          else if(type==='fate'){sequence([300,450,385,600],'sine',.095,.27);}
           else if(type==='chance'){sequence([525,660,785],'triangle',.09,.29);}
           else if(type==='chest'){sequence([650,865,1040,1300],'sine',.085,.25);}
           else if(type==='boss'){sequence([245,220,175],'sawtooth',.12,.20);}

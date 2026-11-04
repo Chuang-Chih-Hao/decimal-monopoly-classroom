@@ -9,23 +9,23 @@ const palette=require('../public/player-colors');
 const index=fs.readFileSync(path.join(__dirname,'../public/index.html'),'utf8');
 const app=fs.readFileSync(path.join(__dirname,'../public/app.js'),'utf8');
 
-test('30 格完整圍成 10×7 方形外圈，四角、相鄰關係與起點正確',()=>{
+test('32 格完整圍成 11×7 長方形外圈，四角、相鄰關係與起點正確',()=>{
   assert.equal(BOARD.length,layout.COUNT);
-  assert.equal(layout.COLUMNS,10);
+  assert.equal(layout.COLUMNS,11);
   assert.equal(layout.ROWS,7);
   assert.equal(layout.WIDTH,layout.COLUMNS*layout.CELL);
   assert.equal(layout.HEIGHT,layout.ROWS*layout.CELL);
   const tiles=BOARD.map(t=>layout.positionFor(t.id));
-  assert.equal(new Set(tiles.map(p=>`${p.col},${p.row}`)).size,30);
-  for(const p of tiles)assert.ok(p.col===0||p.row===0||p.col===9||p.row===6);
-  assert.deepEqual([tiles[0],tiles[9],tiles[15],tiles[24]], [
-    {col:9,row:6},{col:0,row:6},{col:0,row:0},{col:9,row:0}
+  assert.equal(new Set(tiles.map(p=>`${p.col},${p.row}`)).size,32);
+  for(const p of tiles)assert.ok(p.col===0||p.row===0||p.col===10||p.row===6);
+  assert.deepEqual([tiles[0],tiles[10],tiles[16],tiles[26]], [
+    {col:10,row:6},{col:0,row:6},{col:0,row:0},{col:10,row:0}
   ]);
   for(let i=0;i<tiles.length;i++){
     const a=tiles[i],b=tiles[(i+1)%tiles.length];
-    assert.equal(Math.abs(a.col-b.col)+Math.abs(a.row-b.row),1,`格 ${i}→${(i+1)%30} 不相鄰`);
+    assert.equal(Math.abs(a.col-b.col)+Math.abs(a.row-b.row),1,`格 ${i}→${(i+1)%32} 不相鄰`);
   }
-  assert.throws(()=>layout.positionFor(30),RangeError);
+  assert.throws(()=>layout.positionFor(32),RangeError);
   assert.throws(()=>layout.positionFor(-1),RangeError);
 });
 
@@ -592,4 +592,52 @@ test('v1.8.3 其他長事件也不截斷，且標題與訊息有獨立一致的�
   assert.match(css,/\.spotlight-detail\s*\{[^}]*overflow-wrap:anywhere/);
   assert.match(css,/@media\(max-width:640px\)\{[^}]*\.event-spotlight \.spotlight-copy \.spotlight-title/);
   assert.ok(index.includes('/app.js?v=1.8.3'));
+});
+
+
+test('v1.9.0 32 格地圖依舊保留 11×7 外圈與手機縮放控制',()=>{
+  assert.equal(layout.COUNT,32);
+  assert.equal(layout.COLUMNS,11);
+  assert.deepEqual(BOARD.slice(-2).map(x=>x.type),['jail','share']);
+  assert.ok(index.includes('32 格經典'));
+  assert.ok(app.includes('[0,10,16,26].includes(tile.id)'));
+  for(const tile of ['jail','share'])assert.ok(app.includes("theme:'"+tile+"'"));
+  for(const id of ['map-zoom-out','map-zoom-in','map-overview','map-fullsize'])
+    assert.ok(index.includes('id="'+id+'"'));
+});
+
+test('v1.9.0 監獄面板提供服刑、保釋與逾時提示，購地禁令在資產面板標示',()=>{
+  const start=app.indexOf("}else if(phase==='jail-choice')");
+  assert.ok(start>0);
+  const block=app.slice(start,app.indexOf("}else if(phase==='story')",start));
+  for(const phrase of ['jail-serve','jail-pay','jailDecision','jail-timer','bailPurchaseBan','state.jailBail']) {
+    const code=phrase==='bailPurchaseBan'?app:block;
+    assert.ok(code.includes(phrase),phrase);
+  }
+  assert.ok(app.includes('jailChoiceExpiresAt'));
+  assert.ok(index.includes('服刑一回合'));
+  assert.ok(index.includes('均付'));
+});
+
+test('v1.9.0 破產在結算頁註明原因，不再等待手動結束',()=>{
+  for(const id of ['end-title','end-reason'])assert.ok(index.includes('id="'+id+'"'));
+  assert.ok(app.includes("state.finishReason==='bankrupt'"));
+  assert.ok(app.includes('state.bankruptPlayerId'));
+  assert.ok(app.includes('現金歸零'));
+});
+
+test('v1.9.0 歷史回饋只有持房主金鑰者可讀，能搜尋、備份、匯入及刪除',()=>{
+  const server=fs.readFileSync(path.join(__dirname,'../server.js'),'utf8');
+  const store=fs.readFileSync(path.join(__dirname,'../feedback-store.js'),'utf8');
+  for(const id of ['feedback-history-open','feedback-history-modal','feedback-history-status',
+    'feedback-history-results','feedback-history-search','feedback-history-copy-key',
+    'feedback-history-import-key','feedback-history-refresh'])
+    assert.equal((index.match(new RegExp('id="'+id+'"','g'))||[]).length,1,id);
+  assert.ok(app.includes('crypto.getRandomValues(bytes)'));
+  assert.ok(app.includes('historyKey:'));
+  assert.ok(server.includes("socket.on('feedbackHistory'"));
+  assert.ok(server.includes("socket.on('feedbackDelete'"));
+  assert.ok(store.includes('owner_hash=$1'));
+  assert.ok(store.includes('ownerHash(key)'));
+  assert.doesNotMatch(server,/socket\.emit\('feedbackHistory'/);
 });

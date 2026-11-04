@@ -7,6 +7,10 @@ const {GameManager,GameError}=require('./game');
 const {ANIMALS}=require('./board');
 const {TOTAL}=require('./questions');
 const APP_VERSION=require('./package.json').version;
+const {randomUUID}=require('node:crypto');
+const {feedbackRepository,ownerHash,snapshot}=require('./feedback-store');
+const feedbackDb=feedbackRepository();
+void feedbackDb.init().then(ok=>console.log('[Feedback DB]',ok?'Connected':'Not configured or unavailable'));
 
 const app=express();
 const httpServer=http.createServer(app);
@@ -26,7 +30,22 @@ app.use(express.static(path.join(__dirname,'public'),{
 app.get('*',(_req,res)=>res.set('Cache-Control','no-store').sendFile(path.join(__dirname,'public','index.html')));
 
 // 每位玩家收到自己的個人學習回饋；他人的錯題紀錄不會廣播到全房間。
+const archiveQueue=new Map();
+function queueArchive(room){
+  if(room.status!=='finished'||!room.historyOwnerHash||!feedbackDb.status().ready)return Promise.resolve(false);
+  if(!room.finishedAt)room.finishedAt=Date.now();
+  const host=room.players.find(p=>p.host);
+  const state=games.publicState(room,host?.id);
+  const record=snapshot(room,state);
+  if(!record)return Promise.resolve(false);
+  const previous=archiveQueue.get(room.archiveId)||Promise.resolve();
+  const job=previous.catch(()=>{}).then(()=>feedbackDb.upsert(record));
+  archiveQueue.set(room.archiveId,job);
+  job.catch(error=>console.error('[Feedback DB] Save failed:',error.message));
+  return job;
+}
 function broadcast(room) {
+  if(room.status==='finished')void queueArchive(room);
   for(const socketId of io.sockets.adapter.rooms.get(room.code)||[]) {
     const peer=io.sockets.sockets.get(socketId);
     if(peer)peer.emit('state',games.publicState(room,peer.data.playerId));
@@ -37,14 +56,17 @@ function reply(ack,ok,data={}) {if(typeof ack==='function')ack({ok,...data});}
 io.on('connection',(socket)=>{
   function action(handler) {
     return (payload={},ack)=>{
-      try {
-        const result=handler(payload||{}) || {};
-        reply(ack,true,result);
-      } catch(e) {
+      const success=data=>reply(ack,true,data||{});
+      const failure=e=>{
         const err=e instanceof GameError?e.message:'操作失敗，請稍後再試。';
         if(!(e instanceof GameError))console.error(e);
         reply(ack,false,{error:err});
-      }
+      };
+      try{
+        const result=handler(payload||{});
+        if(result&&typeof result.then==='function')result.then(success).catch(failure);
+        else success(result);
+      }catch(e){failure(e);}
     };
   }
   function identity() {
@@ -67,8 +89,12 @@ io.on('connection',(socket)=>{
     broadcast(room);
     return {state:games.publicState(room,player.id),id:player.id,token:player.token,code:room.code};
   }
-  socket.on('create',action(({name,animal})=>{
+  socket.on('create',action(({name,animal,historyKey})=>{
     const {room,player}=games.newRoom(name,animal);
+    if(typeof historyKey==='string'&&/^[a-f0-9]{64}$/i.test(historyKey)){
+      room.historyOwnerHash=ownerHash(historyKey);
+    }
+    room.archiveId=randomUUID();
     return attach(room,player);
   }));
   socket.on('join',action(({code,name,animal})=>{
@@ -89,7 +115,10 @@ io.on('connection',(socket)=>{
     const {room,playerId}=identity();games.removeBot(room,playerId,botId);broadcast(room);
   }));
   socket.on('start',action((settings)=>{
-    const {room,playerId}=identity();games.start(room,playerId,settings);broadcast(room);
+    const {room,playerId}=identity();
+    games.start(room,playerId,settings);
+    room.archiveId=randomUUID();room.startedAt=Date.now();room.finishedAt=null;
+    broadcast(room);
   }));
   socket.on('roll',action(()=>{
     const {room,playerId}=identity();const die=games.roll(room,playerId);broadcast(room);return {die};
@@ -121,8 +150,21 @@ io.on('connection',(socket)=>{
   socket.on('finish',action(()=>{
     const {room,playerId}=identity();games.finishByHost(room,playerId);broadcast(room);
   }));
-  socket.on('saveReflection',action(({text})=>{
-    const {room,playerId}=identity();games.saveReflection(room,playerId,text);broadcast(room);
+  socket.on('saveReflection',action(async({text})=>{
+    const {room,playerId}=identity();
+    games.saveReflection(room,playerId,text);
+    broadcast(room);
+    // 若資料庫已啟用，提交回饋後等寫入完成才回覆成功。
+    if(feedbackDb.status().ready)await archiveQueue.get(room.archiveId);
+  }));
+  socket.on('feedbackDbStatus',action(()=>feedbackDb.status()));
+  socket.on('feedbackHistory',action(async({historyKey,limit})=>{
+    try{return {entries:await feedbackDb.list(historyKey,{limit})};}
+    catch(e){throw new GameError(e.message);}
+  }));
+  socket.on('feedbackDelete',action(async({historyKey,id})=>{
+    try{return {deleted:await feedbackDb.remove(historyKey,id)};}
+    catch(e){throw new GameError(e.message);}
   }));
   socket.on('reset',action(()=>{
     const {room,playerId}=identity();games.reset(room,playerId);broadcast(room);

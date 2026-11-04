@@ -1,7 +1,7 @@
 /* 小數富翁前端：所有資產、擲骰、判分都以伺服器狀態為準。 */
 (() => {
   'use strict';
-  const CLIENT_VERSION='1.8.3';
+  const CLIENT_VERSION='1.9.0';
   const socket=io({transports:['websocket','polling'],reconnection:true});
   const sound=window.DecimalMonopolyAudio;
   const playSound=(kind,detail)=>sound?.play(kind,detail);
@@ -98,6 +98,117 @@
   }
   let tokenData=null;
   try {tokenData=JSON.parse(localStorage.getItem('decimal-monopoly-session')||'null');}catch{tokenData=null;}
+
+
+  // 房主資料的「持有金鑰即有存取權」模型：每個瀏覽器一把隨機 256-bit 金鑰；
+  // 不把歷史回饋放進所有同學都收到的房間狀態。
+  const HISTORY_KEY_NAME='decimal-monopoly-teacher-key-v1';
+  let historyRows=[];
+  let historyModalOpened=false;
+  function getHistoryKey(){
+    try{const key=localStorage.getItem(HISTORY_KEY_NAME);return /^[a-f0-9]{64}$/i.test(key||'')?key:null;}
+    catch{return null;}
+  }
+  function setHistoryKey(key){
+    if(!/^[a-f0-9]{64}$/i.test(key||''))return false;
+    try{localStorage.setItem(HISTORY_KEY_NAME,key.toLowerCase());}catch{}
+    $('feedback-history-open').hidden=false;
+    return true;
+  }
+  function ensureHistoryKey(){
+    const existing=getHistoryKey();
+    if(existing)return existing;
+    if(!window.crypto?.getRandomValues)throw new Error('此瀏覽器不支援安全金鑰產生，無法保存房主歷史回饋。');
+    const bytes=new Uint8Array(32);
+    window.crypto.getRandomValues(bytes);
+    const key=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
+    setHistoryKey(key);
+    return key;
+  }
+  function paintHistory(){
+    const search=$('feedback-history-search').value.trim().toLowerCase();
+    const root=$('feedback-history-results');
+    const list=historyRows.filter(row=>!search||[row.roomCode,row.teacherName,
+      ...(row.playerSummary||[]).map(p=>p.name),...(row.reflections||[]).map(x=>x.text+' '+x.name)]
+      .join(' ').toLowerCase().includes(search));
+    root.innerHTML=list.length?list.map(row=>{
+      const when=new Date(Number(row.finishedAt)).toLocaleString('zh-TW');
+      const classData=row.classFeedback||{};
+      const total=Number(classData.attempted||0),right=Number(classData.correct||0);
+      const reason=row.finishReason==='bankrupt'
+        ?'💸 '+esc(row.bankruptPlayerName||'玩家')+' 破產結算'
+        :'🏆 正常結算';
+      const rank=(row.rankings||[]).slice(0,6).map((p,i)=>
+        '<span>'+String(i+1)+'. '+esc(p.name)+' '+money(p.score)+'</span>').join('、');
+      const reflections=(row.reflections||[]).map(x=>
+        '<div class="history-reflection"><b>'+esc(x.name)+'</b><p>'+esc(x.text)+'</p></div>').join('');
+      return '<details class="history-session"><summary><strong>📘 '+when+'｜'+esc(row.roomCode)+'</strong>'
+        +'<span>'+reason+' · '+Number(row.playerCount)+' 位玩家 · '+(row.reflections?.length||0)+' 份回饋</span></summary>'
+        +'<div class="history-session-content"><p>📊 全班計入作答：'+right+'／'+total+' 題</p>'
+        +'<p>🏆 財富排名：'+rank+'</p>'
+        +'<div class="history-reflection-list">'+(reflections||'<p>這局尚無學生送出文字回饋。</p>')+'</div>'
+        +'<button type="button" class="btn warning small history-delete" data-history-delete="'+esc(row.id)+'">刪除此局紀錄</button>'
+        +'</div></details>';
+    }).join(''):'<p class="history-empty">'+(historyRows.length?'沒有符合搜尋的回饋。':'目前沒有可查閱的歷史紀錄；從資料庫啟用後的結算開始累積。')+'</p>';
+    root.querySelectorAll('[data-history-delete]').forEach(button=>button.addEventListener('click',()=>{
+      if(!window.confirm('確定永久刪除此局的課堂統計與學生文字回饋？此動作無法復原。'))return;
+      request('feedbackDelete',{historyKey:getHistoryKey(),id:button.dataset.historyDelete},(ok,data)=>{
+        if(ok&&data?.deleted){historyRows=historyRows.filter(x=>x.id!==button.dataset.historyDelete);paintHistory();showToast('歷史紀錄已刪除。');}
+      });
+    }));
+  }
+  function refreshHistory(){
+    const status=$('feedback-history-status');
+    if(!getHistoryKey()){
+      status.textContent='目前沒有可用的房主金鑰。請先建立房間或匯入先前備份的金鑰。';
+      $('feedback-history-results').textContent='';return;
+    }
+    if(!socket.connected){
+      status.textContent='連線中；請確認網路連線。';return;
+    }
+    status.textContent='正在檢查資料庫連線…';
+    request('feedbackDbStatus',{},(ok,data)=>{
+      if(!historyModalOpened)return;
+      if(!ok||!data.ready){
+        const message=data?.error||'資料庫尚未啟用';
+        status.textContent='⚠️ '+message+'。永久保存需要 Render DATABASE_URL；免費資料庫將於 2026-12-04 到期。';
+        $('feedback-history-results').textContent='';return;
+      }
+      status.textContent='✅ 已連接歷史回饋資料庫。以下僅顯示持有此房主金鑰的課堂。';
+      request('feedbackHistory',{historyKey:getHistoryKey(),limit:300},(success,result)=>{
+        if(!historyModalOpened)return;
+        if(success){historyRows=result.entries||[];paintHistory();}
+        else status.textContent='⚠️ 查詢失敗，請再試一次。';
+      });
+    });
+  }
+  function initHistoryControls(){
+    const open=$('feedback-history-open'),modal=$('feedback-history-modal');
+    open.hidden=!getHistoryKey();
+    open.addEventListener('click',()=>{
+      historyModalOpened=true;modal.hidden=false;refreshHistory();
+      $('feedback-history-close').focus();
+    });
+    $('feedback-history-close').addEventListener('click',()=>{historyModalOpened=false;modal.hidden=true;open.focus();});
+    modal.addEventListener('click',e=>{if(e.target===modal){historyModalOpened=false;modal.hidden=true;}});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!modal.hidden){historyModalOpened=false;modal.hidden=true;}});
+    $('feedback-history-search').addEventListener('input',paintHistory);
+    $('feedback-history-refresh').addEventListener('click',refreshHistory);
+    $('feedback-history-copy-key').addEventListener('click',async()=>{
+      const key=getHistoryKey();
+      if(!key)return;
+      if(!window.confirm('房主金鑰可以查看所有歷史回饋，請勿分享給學生。確定要備份嗎？'))return;
+      try{await navigator.clipboard.writeText(key);showToast('房主金鑰已複製。請保存在安全位置，不要分享到班級群組。');}
+      catch{window.prompt('請把這段房主金鑰保存在安全位置：',key);}
+    });
+    $('feedback-history-import-key').addEventListener('click',()=>{
+      const key=window.prompt('輸入先前備份的 64 位房主金鑰：')?.trim();
+      if(!key)return;
+      if(!setHistoryKey(key)){showToast('房主金鑰格式不正確。',true);return;}
+      historyRows=[];refreshHistory();
+    });
+  }
+  initHistoryControls();
 
   function playStateSounds(previous,next){
     // 首次加入／重新連線不重播舊答案、勝負、成就或結算。
@@ -239,6 +350,8 @@
       23:{theme:'chance',badge:'機會觸發',className:'fx-lucky',ambient:'<span class="ambient-piece piece-star">✦</span><span class="ambient-piece piece-leaf">🍀</span>'},
       26:{theme:'chest',badge:'寶箱開啟',className:'fx-chest',ambient:'<span class="ambient-piece piece-key">🗝️</span><span class="ambient-piece piece-star">✦</span>'},
       28:{theme:'boss',badge:'Boss 警報',className:'fx-boss',ambient:'<span class="ambient-piece piece-boss">⚡</span><span class="ambient-piece piece-star">✦</span>'},
+      30:{theme:'jail',badge:'冒險監獄',className:'fx-boss',ambient:'<span class="ambient-piece">🔒</span>'},
+      31:{theme:'share',badge:'均付分享站',className:'fx-lucky',ambient:'<span class="ambient-piece">🤝</span>'},
       29:{theme:'wheel',badge:'命運大轉盤',className:'fx-wheel',ambient:'<span class="ambient-piece piece-wheel">🎡</span><span class="ambient-piece piece-spark">✦</span>'},
       0:{theme:'start',badge:'夢想起點',className:'fx-start',ambient:'<span class="ambient-piece piece-flag">🏁</span><span class="ambient-piece piece-spark">✦</span>'},
       10:{theme:'rescue',badge:'黑心商人',className:'fx-alert',ambient:'<span class="ambient-piece piece-alert">❗</span><span class="ambient-piece piece-star">✦</span>'},
@@ -404,7 +517,8 @@
 
   $('create-btn').addEventListener('click',()=>{
     const name=$('player-name').value.trim();if(!name){showToast('請先輸入冒險家暱稱。',true);return;}
-    request('create',{name,animal:selectedAnimal},(ok,data)=>{if(ok){saveSession(data);setInitialState(data.state);showToast('已建立房間！把代碼傳給同學。');}});
+    const historyKey=ensureHistoryKey();
+    request('create',{name,animal:selectedAnimal,historyKey},(ok,data)=>{if(ok){saveSession(data);setInitialState(data.state);showToast('已建立房間！把代碼傳給同學。');}});
   });
   $('join-btn').addEventListener('click',()=>{
     const name=$('player-name').value.trim(),code=$('room-code').value.trim().toUpperCase();
@@ -579,7 +693,7 @@
       const pawns=state.players.filter(p=>p.position===tile.id&&p.id!==activeRollAnimation?.playerId);
       const currentPos=activeRollAnimation ? activeRollAnimation.from : activePlayer()?.position;
       const flavor=tileFlavorSpec(tile);
-      el.className=`tile ${tile.type}${tile.group?' group-'+tile.group:''} tile-theme-${flavor.theme||'event'}${pawns.length?' active-tile':''}${owner?' owned':''}${currentPos===tile.id?' current-turn-tile':''}${[0,9,15,24].includes(tile.id)?' board-corner':''}`;
+      el.className=`tile ${tile.type}${tile.group?' group-'+tile.group:''} tile-theme-${flavor.theme||'event'}${pawns.length?' active-tile':''}${owner?' owned':''}${currentPos===tile.id?' current-turn-tile':''}${[0,10,16,26].includes(tile.id)?' board-corner':''}`;
       el.dataset.tileId=String(tile.id);
       el.dataset.tileTheme=flavor.theme||'event';
       el.style.left=`${(col+.5)*layout.CELL}px`;
@@ -595,7 +709,7 @@
     const center=document.createElement('div');center.id='board-center';center.className='board-center';
     const last=state.lastRoll,who=last?state.players.find(p=>p.id===last.playerId):null;
     const current=activePlayer();
-    const description=last?`${esc(who?.name||'玩家')} 擲出 ${last.die} 點！`:'30 格經典方格棋盤';
+    const description=last?`${esc(who?.name||'玩家')} 擲出 ${last.die} 點！` :'32 格經典方格棋盤';
     center.innerHTML=`<div class="center-content"><div class="center-logo">🌴 💰 🎲</div><div class="center-title">小數富翁<br/>探險島</div><div class="center-desc">${description}<br/>買店面・算折扣・雙人對戰</div><div class="center-turn" style="${colorStyle(current)}">${animalHtml(current?.animal||'🐾')} 現在輪到 ${esc(current?.name||'冒險家')}</div>${last?`<span class="dice-face" aria-label="${last.die} 點">${diceIcons[last.die]}</span>`:''}</div>`;
     board.appendChild(center);
     const focusKey=state.currentPlayerId;
@@ -768,6 +882,18 @@
     if(phase==='rolling'){
       el.innerHTML=turn?'<button id="roll-btn" class="btn primary roll-btn">🎲 擲骰子！</button><div class="phase-help">點擊後會沿著地圖前進 1～6 格。</div>':`<div class="phase-help">等待 ${esc(activePlayer()?.name)} 擲骰子…</div>`;
       $('roll-btn')?.addEventListener('click',()=>request('roll'));
+    }else if(phase==='jail-choice'){
+      const cash=activePlayer()?.cash||0;
+      el.innerHTML=`<div class="jail-choice"><h3>🚔 監獄抉擇</h3>
+        <p>${esc(activePlayer()?.name)} 要服刑 1 回合，還是支付 ${money(state.jailBail||80)} 立即出獄？</p>
+        <p class="jail-rule">⚠️ 付保釋金出獄當回合有前科，不可購買新房產。</p>
+        ${turn?`<div class="jail-actions"><button id="jail-serve" type="button" class="btn outline">🔒 服刑一回合</button>
+            <button id="jail-pay" type="button" class="btn warning" ${cash<(state.jailBail||80)?'disabled':''}>💰 付 ${money(state.jailBail||80)} 出獄</button></div>`
+          :'<div class="phase-help">等待獄中的玩家選擇…</div>'}
+        <div id="jail-timer" class="phase-help"></div></div>`;
+      $('jail-serve')?.addEventListener('click',()=>request('jailDecision',{pay:false}));
+      $('jail-pay')?.addEventListener('click',()=>request('jailDecision',{pay:true}));
+      updateTimer();
     }else if(phase==='story'){
       el.innerHTML=`<div class="phase-help">${turn?'🔮 命運事件！請選擇一條冒險路線。':'🔮 '+esc(activePlayer()?.name)+' 正在決定命運分支！'}</div>`;
     }else if(phase==='answering'){
@@ -872,6 +998,11 @@
     if(timer)timer.textContent=`⏱️ 還有 ${rem} 秒（本題 ${state?.questionSeconds||120} 秒）｜可使用紙筆計算；逾時視為未答對`;
     if(fill){fill.style.width=`${Math.min(100,rem/(state?.questionSeconds||120)*100)}%`;fill.style.background=rem<20?'#d77470':'#e6a267';}
     }
+    const jailTimer=$('jail-timer');
+    if(jailTimer&&state?.phase==='jail-choice'){
+      const left=Math.max(0,Math.ceil(((state.jailChoiceExpiresAt||Date.now())-Date.now())/1000));
+      jailTimer.textContent=`⏳ 剩 ${left} 秒；逾時自動服刑一回合。`;
+    }
     const st=$('story-timer-label');
     if(st&&p?.type==='story')st.textContent='⏱️ 還有 '+Math.max(0,Math.ceil((p.expiresAt-Date.now())/1000))+' 秒選擇；逾時自動採取穩健方案。';
     const betweenTimer=$('between-timer');
@@ -910,10 +1041,12 @@
     if(!p){el.hidden=true;return;}
     el.hidden=false;
     const paint=colorFor(p),assetValue=landValue(p);
+    const jailNotice=p.jailed?'<div class="jail-player-warning">🚔 監獄中：下次輪到時須服刑或保釋出獄。</div>'
+      :p.bailPurchaseBan?'<div class="jail-player-warning">🚫 本回合保釋出獄：不可購買房產。</div>':'';
     const properties=p.properties.map(id=>state.board[id]).filter(Boolean).sort((a,b)=>a.id-b.id);
     el.innerHTML=`<div class="assets-header" style="${colorStyle(p)}"><span class="assets-title">💼 我的資產</span><span class="my-identity">${animalHtml(p.animal)} ${esc(p.name)} · ${paint.name}</span></div>
       <div class="asset-totals" style="${colorStyle(p)}"><div class="asset-metric"><span>💵 現金餘額</span><strong>${money(p.cash)}</strong></div><div class="asset-metric"><span>🏠 房產總值</span><strong>${money(assetValue)}</strong></div><div class="asset-metric asset-sum"><span>💰 總資產</span><strong>${money(wealth(p))}</strong></div></div>
-      <div class="assets-land-heading">🏡 我的房產（${properties.length} 處）<small>點選可定位到棋盤</small></div>
+      ${jailNotice}<div class="assets-land-heading">🏡 我的房產（${properties.length} 處）<small>點選可定位到棋盤</small></div>
       <div class="assets-property-list">${properties.length?properties.map(tile=>`<button type="button" class="asset-property" style="${colorStyle(p)}" data-asset-tile="${tile.id}" title="聚焦到 ${esc(tile.name)}"><span class="asset-property-name">${esc(tile.icon)} ${esc(tile.name)}</span><span>價值 ${money(tile.price)} · 租金 ${money(tile.rent)}</span></button>`).join(''):'<span class="assets-empty">還沒有房產。答對購地題後就能購買，土地會以你的代表色標示。</span>'}</div>`;
     el.querySelectorAll('[data-asset-tile]').forEach(btn=>btn.addEventListener('click',()=>{
       if(activeRollAnimation){showToast('棋子正在移動，請稍後再查看房產。');return;}
@@ -1012,6 +1145,11 @@
     ).join('');
   }
   function renderEnd(){
+    $('end-title').textContent=state.finishReason==='bankrupt'?'💸 有玩家破產，立即結算！':'小數富翁，正式結算！';
+    const bankrupt=state.players.find(p=>p.id===state.bankruptPlayerId);
+    $('end-reason').textContent=state.finishReason==='bankrupt'
+      ?`${bankrupt?.name||'玩家'} 現金歸零，遊戲提前結束。依每人現金＋房產原價計算最終排名。`
+      :'用現金＋房產原價計算總資產，答題數據也一起公開。';
     $('end-rankings').innerHTML=state.rankings.map((r,i)=>`<div class="end-row" style="${colorStyle(r)}"><strong>${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</strong><span class="avatar">${animalHtml(r.animal)}</span><div><strong><span class="person-color-dot"></span>${esc(r.name)}${r.isBot?' 🤖 BOT':''}（${colorFor(r).name}）</strong><div class="end-stats">${r.titleId?esc(badgeFor(r.titleId)?.icon+' '+badgeFor(r.titleId)?.title)+' · ':''}現金 ${money(r.cash)} ＋ 房產 ${money(r.landValue)} · 答對 ${r.correct}/${r.attempted}</div></div><div class="end-amount">${money(r.score)}</div></div>`).join('');
     renderLearningFeedback();
     renderEndAchievements();
