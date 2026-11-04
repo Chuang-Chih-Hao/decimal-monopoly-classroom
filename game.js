@@ -4,13 +4,15 @@ const { BOARD, ANIMALS } = require('./board');
 const { BANK } = require('./questions');
 const {summarizePlayer,summarizeClass}=require('./feedback');
 
-const MAX_PEOPLE = 6; // 一位房主 + 最多五位學生
+const MAX_PEOPLE = 6; // 一位房主 + 最多五位真人／機器人
 const QUESTION_SECONDS = 120; // 六年級學生預設有兩分鐘計算時間
 const DUEL_SECONDS = 25; // 每次小遊戲出招時間；不影響主題數學題倒數
 const GAME_MINUTES = 30;
 const LOBBY_DEFAULTS = Object.freeze({rounds:'unlimited',money:900,questionSeconds:120,durationMinutes:30});
 const MAX_REFLECTION_LENGTH = 600;
 const STORY_SECONDS = 25;
+const BOT_ACCURACY = 0.65; // 機器人不保證每題答對
+const BOT_STEP_DELAY_MS = 1200; // 定期 tick 觸發，保留演出節奏
 const ACHIEVEMENTS = Object.freeze([
   {id:'first_answer',icon:'🌟',title:'小數新星',description:'正式答對第 1 道數學題'},
   {id:'three_correct',icon:'🧮',title:'計算達人',description:'正式累積答對 3 道數學題'},
@@ -106,7 +108,7 @@ class GameManager {
       questionSeconds:QUESTION_SECONDS,durationMinutes:GAME_MINUTES,endsAt:null,bonusStage:0,
       settings:{...LOBBY_DEFAULTS},
       duel:null,lastDuel:null,poll:null,lastPoll:null,lastAchievement:null,
-      board: BOARD, properties:{}, pending:null, phase:'lobby',
+      board: BOARD, properties:{}, pending:null, phase:'lobby',botAction:null,
       lastRoll:null, lastResult:null, log:[], questionQueues:{},
       updatedAt:Date.now(), createdAt:Date.now(), rankings:[]
     };
@@ -127,9 +129,9 @@ class GameManager {
     if (!ANIMALS.includes(animal)) throw new GameError('請選擇列表中的動物棋子。');
   }
 
-  makePlayer(name, animal, host=false) {
-    return { id:randomUUID(), token:randomBytes(24).toString('hex'), name, animal,
-      host, connected:true, socketId:null, cash:0, properties:[], position:0,
+  makePlayer(name, animal, host=false, isBot=false) {
+    return { id:randomUUID(), token:isBot?null:randomBytes(24).toString('hex'), name, animal,
+      host, isBot, connected:true, socketId:null, cash:0, properties:[], position:0,
       missedTurns:0, correct:0, attempted:0, answerHistory:[],reflection:null,
        achievements:[],titleId:null,spectatorCorrect:0,spectatorAttempted:0 };
   }
@@ -137,7 +139,7 @@ class GameManager {
   join(code, name, animal) {
     const room = requireRoom(this.get(code));
     if (room.status !== 'lobby') throw new GameError('這間房已開始遊戲，僅原玩家可以重新連線。');
-    if (room.players.length >= MAX_PEOPLE) throw new GameError('房間已滿（房主加五位學生）。');
+    if (room.players.length >= MAX_PEOPLE) throw new GameError('房間已滿（含房主、真人與機器人最多六位）。');
     this.checkAnimal(animal);
     const clean = this.cleanName(name);
     if (room.players.some(p => p.name === clean)) throw new GameError('暱稱已有人使用，請換一個。');
@@ -148,9 +150,86 @@ class GameManager {
     return { room, player };
   }
 
+  addBot(room,hostId) {
+    requireHost(room,hostId);
+    if(room.status!=='lobby')throw new GameError('只能在等待室新增機器人。');
+    if(room.players.length>=MAX_PEOPLE)throw new GameError('房間已滿（最多六位玩家，包含機器人）。');
+    const animal=ANIMALS.find(a=>!room.players.some(p=>p.animal===a));
+    if(!animal)throw new GameError('目前沒有可用的動物棋子。');
+    let index=1;
+    while(room.players.some(p=>p.name===`小數機器人${index}`))index++;
+    const bot=this.makePlayer(`小數機器人${index}`,animal,false,true);
+    room.players.push(bot);
+    message(room,`🤖 房主新增了 ${bot.name}，由伺服器自動擲骰與解題。`);
+    return bot;
+  }
+
+  removeBot(room,hostId,botId) {
+    requireHost(room,hostId);
+    if(room.status!=='lobby')throw new GameError('只能在等待室移除機器人。');
+    const bot=room.players.find(p=>p.id===botId);
+    if(!bot?.isBot)throw new GameError('只能移除機器人，不能移除真人玩家。');
+    room.players=room.players.filter(p=>p.id!==botId);
+    message(room,`🤖 房主移除了 ${bot.name}。`);
+  }
+
+  // 機器人動作只由伺服器觸發；瀏覽器無法取得機器人的登入 token。
+  botIntent(room) {
+    if(room.status!=='playing')return null;
+    const actor=room.players.find(p=>p.id===room.currentPlayerId);
+    if(room.phase==='duel'&&room.duel){
+      const d=room.duel;
+      const bot=room.players.find(p=>p.isBot&&[d.renterId,d.ownerId].includes(p.id)
+        &&!Object.hasOwn(d.choices,p.id));
+      if(bot)return {key:`duel:${d.id}:${d.round}:${bot.id}`,delayMs:4200,act:()=>this.duelChoice(room,bot.id,Math.floor(Math.random()*(d.mode==='rps'?3:5)))};
+    }
+    if(room.phase==='answering'&&room.poll&&room.pending?.question){
+      if(actor?.isBot){
+        const p=room.pending;
+        return {key:`answer:${room.poll.id}`,delayMs:4300,act:()=>this.answer(room,actor.id,this.botAnswerIndex(p.question))};
+      }
+      const spectator=room.players.find(p=>p.isBot&&p.id!==room.currentPlayerId
+        &&!Object.hasOwn(room.poll.choices,p.id));
+      if(spectator)return {key:`spectate:${room.poll.id}:${spectator.id}`,delayMs:4200,
+        act:()=>this.spectatorGuess(room,spectator.id,this.botAnswerIndex(room.pending.question))};
+    }
+    if(!actor?.isBot)return null;
+    const tag=`${room.round}:${room.turnIndex}:${actor.id}`;
+    if(room.phase==='rolling')return {key:`roll:${tag}:${room.lastRoll?.id||'initial'}`,
+      act:()=>this.roll(room,actor.id)};
+    if(room.phase==='story'&&room.pending?.type==='story')return {
+      key:`story:${tag}:${room.pending.expiresAt}`,delayMs:4200,
+      act:()=>this.chooseStory(room,actor.id,Math.random()<.7?'safe':'bold')};
+    if(room.phase==='buying'&&room.pending?.type==='buying')return {
+      key:`buy:${tag}:${room.pending.tileId}`,
+      act:()=>this.decideBuy(room,actor.id,Math.random()<.85)};
+    if(room.phase==='between')return {key:`next:${tag}:${room.lastRoll?.id||'none'}`,
+      act:()=>this.nextTurn(room,actor.id)};
+    return null;
+  }
+
+  botAnswerIndex(question) {
+    if(Math.random()<BOT_ACCURACY)return question.correctIndex;
+    const wrong=[0,1,2,3].filter(i=>i!==question.correctIndex);
+    return wrong[Math.floor(Math.random()*wrong.length)];
+  }
+
+  botStep(room,now=Date.now()) {
+    const intent=this.botIntent(room);
+    if(!intent){room.botAction=null;return false;}
+    if(room.botAction?.key!==intent.key){
+      room.botAction={key:intent.key,readyAt:now+(intent.delayMs??BOT_STEP_DELAY_MS)};
+      return false;
+    }
+    if(now<room.botAction.readyAt)return false;
+    room.botAction=null;
+    intent.act();
+    return true;
+  }
+
   findSession(code, token) {
     const room = requireRoom(this.get(code));
-    const player = room.players.find(p => p.token === token);
+    const player = room.players.find(p => !p.isBot && p.token && p.token === token);
     if (!player) throw new GameError('無法恢復此玩家的連線，請重新輸入房間代碼。');
     player.connected = true;
     room.updatedAt = Date.now();
@@ -208,7 +287,7 @@ class GameManager {
     room.bonusStage=0;room.duel=null;room.lastDuel=null;room.poll=null;room.lastPoll=null;room.lastAchievement=null;
     room.turnIndex=0; room.currentPlayerId=room.players[0].id;
     room.properties={}; room.pending=null; room.lastRoll=null; room.lastResult=null;
-    room.questionQueues={}; room.rankings=[];
+    room.questionQueues={}; room.rankings=[];room.botAction=null;
     room.players.forEach(p=>{p.cash=money;p.properties=[];p.position=0;p.correct=0;p.attempted=0;p.answerHistory=[];p.reflection=null;p.missedTurns=0;p.achievements=[];p.titleId=null;p.spectatorCorrect=0;p.spectatorAttempted=0;});
     message(room, `🎉 遊戲開始！每人獲得 $${money}，每題 ${questionSeconds} 秒，${unlimited?'無輪數上限':'最多 '+limit+' 輪'}，${durationMinutes} 分鐘後結算（房主也可提前結束）。${room.players[0].name} 先擲骰。`);
   }
@@ -620,11 +699,11 @@ class GameManager {
 
   finish(room) {
     room.status='finished';room.phase='finished';room.currentPlayerId=null;
-    room.pending=null;room.duel=null;room.poll=null;
+    room.pending=null;room.duel=null;room.poll=null;room.botAction=null;
     room.rankings=room.players.map(p=>({id:p.id,name:p.name,animal:p.animal,
       cash:p.cash,landValue:p.properties.reduce((v,id)=>v+BOARD[id].price,0),
       score:p.cash+p.properties.reduce((v,id)=>v+BOARD[id].price,0),
-      correct:p.correct,attempted:p.attempted,titleId:p.titleId,achievements:p.achievements.length})).sort((a,b)=>b.score-a.score||b.correct-a.correct);
+      correct:p.correct,attempted:p.attempted,titleId:p.titleId,achievements:p.achievements.length,isBot:!!p.isBot})).sort((a,b)=>b.score-a.score||b.correct-a.correct);
     message(room, `🏆 遊戲結束！總資產最高的是 ${room.rankings[0].name}（$${room.rankings[0].score}）！`);
   }
 
@@ -638,7 +717,7 @@ class GameManager {
     requireHost(room,hostId);
     if(room.status!=='finished') throw new GameError('請先結束這一局。');
     room.status='lobby';room.phase='lobby';room.currentPlayerId=null;
-    room.round=1;room.rankings=[];room.pending=null;room.properties={};
+    room.round=1;room.rankings=[];room.pending=null;room.properties={};room.botAction=null;
     room.lastRoll=null;room.lastResult=null;room.duel=null;room.lastDuel=null;room.endsAt=null;room.bonusStage=0;room.questionQueues={};room.poll=null;room.lastPoll=null;room.lastAchievement=null;
     room.players.forEach(p=>{p.cash=0;p.properties=[];p.position=0;p.missedTurns=0;p.correct=0;p.attempted=0;p.answerHistory=[];p.reflection=null;p.achievements=[];p.titleId=null;p.spectatorCorrect=0;p.spectatorAttempted=0;});
     message(room,'🔁 房主已開啟下一局，所有玩家保留座位。');
@@ -652,7 +731,7 @@ class GameManager {
       settings:{...room.settings},
       roundLimit:room.roundLimit,startMoney:room.startMoney,currentPlayerId:room.currentPlayerId,
       durationMinutes:room.durationMinutes,endsAt:room.endsAt,questionSeconds:room.questionSeconds,bonusStage:room.bonusStage,
-      players:room.players.map(p=>({id:p.id,name:p.name,animal:p.animal,host:p.host,
+      players:room.players.map(p=>({id:p.id,name:p.name,animal:p.animal,host:p.host,isBot:!!p.isBot,
         connected:p.connected,cash:p.cash,properties:p.properties,position:p.position,
         missedTurns:p.missedTurns,correct:p.correct,attempted:p.attempted,
         achievements:[...p.achievements],titleId:p.titleId})),
@@ -678,10 +757,10 @@ class GameManager {
            question:{id:room.pending.question.id,text:room.pending.question.text,
              options:room.pending.question.options},expiresAt:room.pending.expiresAt}),
       log:room.log,rankings:room.rankings,
-      classFeedback:finished?summarizeClass(room.players):null,
+      classFeedback:finished?summarizeClass(room.players.filter(p=>!p.isBot)):null,
       personalFeedback:viewer?summarizePlayer(viewer.answerHistory):null,
       myReflection:viewer?.reflection??null,
-      hostReflections:finished&&viewer?.host?room.players.map(p=>({
+      hostReflections:finished&&viewer?.host?room.players.filter(p=>!p.isBot).map(p=>({
         id:p.id,name:p.name,animal:p.animal,reflection:p.reflection?{...p.reflection}:null
       })):null
     };
@@ -712,6 +791,7 @@ class GameManager {
         message(room,`⏰ ${room.durationMinutes} 分鐘課堂時段已結束，開始總資產結算。`);
         this.finish(room);changed=true;
       }
+      if(room.status==='playing'&&this.botStep(room,now))changed=true;
       if(changed)onChange(room);
     }
   }

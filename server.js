@@ -82,6 +82,12 @@ io.on('connection',(socket)=>{
   socket.on('updateSettings',action((patch)=>{
     const {room,playerId}=identity();games.updateSettings(room,playerId,patch);broadcast(room);
   }));
+  socket.on('addBot',action(()=>{
+    const {room,playerId}=identity();games.addBot(room,playerId);broadcast(room);
+  }));
+  socket.on('removeBot',action(({botId})=>{
+    const {room,playerId}=identity();games.removeBot(room,playerId,botId);broadcast(room);
+  }));
   socket.on('start',action((settings)=>{
     const {room,playerId}=identity();games.start(room,playerId,settings);broadcast(room);
   }));

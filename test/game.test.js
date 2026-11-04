@@ -622,3 +622,191 @@ test('成就與稱號：正式答題、購地達標自動解鎖，結算後保�
   assert.equal(host.spectatorCorrect,0);
   assert.equal(room.lastAchievement,null);
 });
+
+
+// v1.8.0：房主等待室機器人與伺服器自主回合流程。
+function advanceBot(game,room) {
+  // 第一次 tick 只排程，第二次把排程到期後才執行；不必在測試中真的等待。
+  assert.equal(game.botStep(room),false);
+  assert.ok(room.botAction?.readyAt>Date.now());
+  assert.equal(game.botStep(room,room.botAction.readyAt+1),true);
+}
+
+test('v1.8.0 房主可新增機器人、不重複動物或暱稱、六人上限包含機器人',()=>{
+  const game=new GameManager();
+  const {room,player:host}=game.newRoom('老師','capybara');
+  const first=game.addBot(room,host.id);
+  assert.equal(first.isBot,true);
+  assert.equal(first.host,false);
+  assert.equal(first.connected,true);
+  assert.equal(first.token,null);
+  assert.equal(first.socketId,null);
+  assert.equal(first.animal,ANIMALS[1]);
+  assert.equal(first.name,'小數機器人1');
+  assert.equal(game.publicState(room,host.id).players[1].isBot,true);
+  assert.ok(!JSON.stringify(game.publicState(room,host.id)).includes('"token"'));
+  assert.throws(()=>game.findSession(room.code,null),GameError);
+  assert.throws(()=>game.addBot(room,first.id),GameError);
+  for(let i=2;i<=5;i++)game.addBot(room,host.id);
+  assert.equal(room.players.length,6);
+  assert.equal(new Set(room.players.map(p=>p.animal)).size,6);
+  assert.equal(new Set(room.players.map(p=>p.name)).size,6);
+  assert.throws(()=>game.addBot(room,host.id),GameError);
+  assert.throws(()=>game.join(room.code,'真人','🐕'),GameError);
+});
+
+test('v1.8.0 機器人與真人混合入房；只有房主能在等待室移除機器人',()=>{
+  const game=new GameManager();
+  const {room,player:host}=game.newRoom('老師','capybara');
+  const {player:student}=game.join(room.code,'學生','🐈');
+  const bot=game.addBot(room,host.id);
+  assert.notEqual(bot.animal,student.animal);
+  assert.throws(()=>game.removeBot(room,student.id,bot.id),GameError);
+  assert.throws(()=>game.removeBot(room,host.id,student.id),GameError);
+  game.removeBot(room,host.id,bot.id);
+  assert.equal(room.players.length,2);
+  assert.equal(room.players[1].id,student.id);
+  const next=game.addBot(room,host.id);
+  assert.equal(next.name,'小數機器人1');
+  game.start(room,host.id);
+  assert.throws(()=>game.addBot(room,host.id),GameError);
+  assert.throws(()=>game.removeBot(room,host.id,next.id),GameError);
+});
+
+test('v1.8.0 房主加一台機器人即可開始，機器人會擲骰、解購地題、購地、完成回合',()=>{
+  const game=new GameManager();
+  const {room,player:host}=game.newRoom('老師','capybara');
+  const bot=game.addBot(room,host.id);
+  game.start(room,host.id,{rounds:3,money:900});
+  assert.equal(room.players.length,2);
+  game.nextTurn(room,host.id,true);
+  assert.equal(room.currentPlayerId,bot.id);
+  const previous=Math.random;
+  Math.random=()=>0; // 擲出 1 點，答對且決定購買。
+  try {
+    advanceBot(game,room);
+    assert.equal(room.phase,'answering');
+    assert.equal(bot.position,1);
+    assert.equal(room.pending.type,'purchase');
+    advanceBot(game,room);
+    assert.equal(room.phase,'buying');
+    assert.equal(bot.correct,1);
+    advanceBot(game,room);
+    assert.equal(room.phase,'between');
+    assert.equal(room.properties[1],bot.id);
+    assert.equal(bot.cash,760);
+    advanceBot(game,room);
+    assert.equal(room.currentPlayerId,host.id);
+    assert.equal(room.phase,'rolling');
+  } finally {Math.random=previous;}
+});
+
+test('v1.8.0 機器人遇到命運劇情時會自行選分支並完成題目',()=>{
+  const game=new GameManager();
+  const {room,player:host}=game.newRoom('老師','capybara');
+  const bot=game.addBot(room,host.id);
+  game.start(room,host.id);
+  game.nextTurn(room,host.id,true);
+  game.land(room,bot,BOARD[8]);
+  assert.equal(room.phase,'story');
+  const previous=Math.random;Math.random=()=>0;
+  try{
+    advanceBot(game,room);
+    assert.equal(room.phase,'answering');
+    assert.equal(room.pending.type,'fate');
+    assert.ok(room.pending.context.card.choiceLabel.includes('穩健'));
+    advanceBot(game,room);
+    assert.equal(bot.attempted,1);
+    assert.equal(bot.correct,1);
+    assert.equal(room.phase,'between');
+  } finally {Math.random=previous;}
+});
+
+test('v1.8.0 機器人當屋主時也會自動出招；真人回合正常完成雙人對戰',()=>{
+  const game=new GameManager();
+  const {room,player:host}=game.newRoom('老師','capybara');
+  const bot=game.addBot(room,host.id);
+  game.start(room,host.id);
+  room.properties[1]=bot.id;bot.properties.push(1);
+  const previous=Math.random;Math.random=()=>0;
+  try{
+    game.land(room,host,BOARD[1]);
+    assert.equal(room.phase,'duel');
+    assert.equal(room.duel.mode,'rps');
+    advanceBot(game,room);
+    assert.equal(room.duel.choices[bot.id],0);
+    game.duelChoice(room,host.id,1);
+    assert.equal(room.phase,'between');
+    assert.equal(room.duel,null);
+    assert.equal(room.lastDuel.winnerId,host.id);
+  } finally {Math.random=previous;}
+});
+
+test('v1.8.0 機器人能觀戰真人題目，但正式題目與班級學習統計不受影響',()=>{
+  const game=new GameManager();
+  const {room,player:host}=game.newRoom('老師','capybara');
+  const bot=game.addBot(room,host.id);
+  game.start(room,host.id);
+  game.ask(room,'discount');
+  const previous=Math.random;Math.random=()=>0;
+  try{
+    advanceBot(game,room);
+    assert.equal(room.poll.choices[bot.id],room.pending.question.correctIndex);
+    assert.equal(bot.attempted,0);
+    assert.equal(bot.spectatorAttempted,0); // 題目尚未公布
+    const publicState=game.publicState(room,host.id);
+    assert.equal(publicState.spectatorPoll.myChoice,null);
+    assert.equal(JSON.stringify(publicState).includes('correctIndex'),false);
+    game.answer(room,host.id,chooseCorrect(room));
+    assert.equal(bot.spectatorCorrect,1);
+    assert.equal(bot.attempted,0);
+    game.finishByHost(room,host.id);
+    assert.equal(game.publicState(room,host.id).classFeedback.attempted,1);
+    assert.equal(game.publicState(room,host.id).rankings.length,2);
+    assert.equal(game.publicState(room,host.id).rankings.find(p=>p.id===bot.id).isBot,true);
+    assert.equal(game.publicState(room,host.id).hostReflections.length,1);
+  } finally {Math.random=previous;}
+});
+
+test('v1.8.0 機器人答題正確率不是 100%，房主重新開局後機器人仍保留席位',()=>{
+  const game=new GameManager();
+  const {room,player:host}=game.newRoom('老師','capybara');
+  const bot=game.addBot(room,host.id);
+  game.start(room,host.id);
+  game.nextTurn(room,host.id,true);
+  game.ask(room,'calc');
+  const previous=Math.random;Math.random=()=>.999;
+  try{
+    advanceBot(game,room);
+    assert.equal(bot.attempted,1);
+    assert.equal(bot.correct,0);
+    assert.equal(room.phase,'between');
+  }finally{Math.random=previous;}
+  game.finishByHost(room,host.id);
+  game.reset(room,host.id);
+  assert.equal(room.status,'lobby');
+  assert.equal(room.players.find(p=>p.id===bot.id).isBot,true);
+  assert.equal(bot.attempted,0);
+  assert.equal(room.botAction,null);
+  game.removeBot(room,host.id,bot.id);
+  assert.equal(room.players.length,1);
+});
+
+test('v1.8.0 由伺服器 tick 自動推進機器人回合，無機器人時不會自動擲骰',()=>{
+  const game=new GameManager();
+  const {room,player:host}=game.newRoom('老師','capybara');
+  const bot=game.addBot(room,host.id);
+  game.start(room,host.id);
+  let sent=0;
+  game.tick(()=>sent++);
+  assert.equal(room.phase,'rolling');
+  assert.equal(room.botAction,null);
+  game.nextTurn(room,host.id,true);
+  game.tick(()=>sent++);
+  assert.equal(room.phase,'rolling');
+  assert.ok(room.botAction?.key.startsWith('roll:'));
+  room.botAction.readyAt=Date.now()-1;
+  game.tick(()=>sent++);
+  assert.equal(sent,1);
+  assert.equal(room.lastRoll.playerId,bot.id);
+});

@@ -378,3 +378,49 @@ test('v1.7.4 離開房間按鈕具對比、足夠觸控高度與手機全寬布�
   assert.match(style,/\.lobby-leave-btn\{width:100%;min-height:48px\}/);
   assert.match(style,/\.lobby-leave-btn:focus-visible\{outline:/);
 });
+
+
+// v1.8.0：機器人玩家等待室 UI / Socket.IO 串接回歸。
+test('v1.8.0 等待室只有房主設定區提供新增機器人按鈕，可顯示空位及移除操作',()=>{
+  const start=index.indexOf('<section id="lobby-screen"');
+  const end=index.indexOf('<section id="playing-screen"',start);
+  const lobby=index.slice(start,end);
+  assert.ok(start>=0&&end>start);
+  assert.equal((lobby.match(/id="add-bot-btn"/g)||[]).length,1);
+  const host=lobby.indexOf('id="host-settings"'),panel=lobby.indexOf('class="lobby-bot-controls"');
+  const settings=lobby.indexOf('class="setting-grid"');
+  assert.ok(host>=0&&panel>host&&panel<settings);
+  assert.ok(lobby.includes('id="lobby-bot-count"'));
+  assert.ok(lobby.includes('aria-label="新增機器人玩家"'));
+  assert.ok(app.includes("request('addBot',{},ok=>"));
+  assert.ok(app.includes("request('removeBot',{botId:btn.dataset.removeBot}"));
+  assert.ok(app.includes('p?.isBot'));
+  assert.ok(app.includes('data-remove-bot'));
+  assert.ok(app.includes('state.players.length>=6'));
+});
+
+test('v1.8.0 機器人與真人在等待室及排行榜有清楚區隔，手機保持可點擊',()=>{
+  const style=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
+  assert.match(style,/\.lobby-bot-controls\s*\{/);
+  assert.match(style,/\.lobby-bot-slot\s*\{/);
+  assert.match(style,/\.bot-mini-label\s*\{/);
+  assert.match(style,/\.add-bot-btn\s*\{/);
+  assert.match(style,/\.lobby-remove-bot\s*\{/);
+  assert.match(style,/\.add-bot-btn\{width:100%;min-height:48px\}/);
+  assert.ok(app.includes("p.isBot?' 🤖 BOT'"));
+  assert.ok(app.includes("r.isBot?' 🤖 BOT'"));
+});
+
+test('v1.8.0 機器人事件只有伺服器處理，不能由外部 Socket.IO 模擬自動行動',()=>{
+  const server=fs.readFileSync(path.join(__dirname,'../server.js'),'utf8');
+  const game=fs.readFileSync(path.join(__dirname,'../game.js'),'utf8');
+  assert.match(server,/socket\.on\('addBot',action\(/);
+  assert.match(server,/socket\.on\('removeBot',action\(/);
+  assert.ok(server.includes('games.addBot(room,playerId)'));
+  assert.ok(server.includes('games.removeBot(room,playerId,botId)'));
+  assert.ok(game.includes("botStep(room,now=Date.now())"));
+  assert.ok(game.includes("this.botStep(room,now)"));
+  assert.ok(game.includes('requireHost(room,hostId)'));
+  assert.ok(game.includes('room.players.filter(p=>!p.isBot)'));
+  assert.doesNotMatch(server,/socket\.on\('botStep'/);
+});

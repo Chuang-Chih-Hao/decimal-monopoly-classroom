@@ -1,7 +1,7 @@
 /* 小數富翁前端：所有資產、擲骰、判分都以伺服器狀態為準。 */
 (() => {
   'use strict';
-  const CLIENT_VERSION='1.7.4';
+  const CLIENT_VERSION='1.8.0';
   const socket=io({transports:['websocket','polling'],reconnection:true});
   const $=id=>document.getElementById(id);
   const esc=(value)=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -331,6 +331,10 @@
   for(const id of ['round-select','money-select','question-time-select','duration-select']){
     $(id).addEventListener('change',()=>{if(isHost()&&state?.status==='lobby')request('updateSettings',settingsFromForm());});
   }
+  $('add-bot-btn').addEventListener('click',()=>{
+    const btn=$('add-bot-btn');btn.disabled=true;
+    request('addBot',{},ok=>{if(!ok){btn.disabled=false;renderLobby();}});
+  });
   $('start-btn').addEventListener('click',()=>request('start',settingsFromForm()));
   $('reflection-input').addEventListener('input',()=>{reflectionDirty=true;updateReflectionUI();});
   $('reflection-save').addEventListener('click',()=>{
@@ -435,14 +439,22 @@
   function renderLobby(){
     const list=$('lobby-slots');list.innerHTML='';
     for(let i=0;i<6;i++){
-      const p=state.players[i];const div=document.createElement('div');div.className='lobby-slot'+(p?'':' empty');
+      const p=state.players[i];const div=document.createElement('div');
+      div.className='lobby-slot'+(p?'':' empty')+(p?.isBot?' lobby-bot-slot':'');
       if(p)div.style.cssText=colorStyle(p);
       div.innerHTML=p
-        ? `<div class="lobby-animal">${animalHtml(p.animal)}</div><div><div class="lobby-name">${esc(p.name)}${p.id===me?'（我）':''}</div><div class="lobby-meta">${colorFor(p).name}棋子 · ${p.host?'👑 房主':'冒險家'} · ${p.connected?'已連線':'暫時離線'}</div></div>`
+        ? `<div class="lobby-animal">${animalHtml(p.animal)}</div><div class="lobby-slot-info"><div class="lobby-name">${esc(p.name)}${p.id===me?'（我）':''}${p.isBot?' <span class="bot-mini-label">🤖 BOT</span>':''}</div><div class="lobby-meta">${colorFor(p).name}棋子 · ${p.host?'👑 房主':p.isBot?'🤖 自動玩家':'冒險家'} · ${p.isBot?'自動操作':p.connected?'已連線':'暫時離線'}</div></div>${p.isBot&&isHost()?`<button class="lobby-remove-bot" type="button" data-remove-bot="${esc(p.id)}" aria-label="移除 ${esc(p.name)}">移除</button>`:''}`
         :`<div class="lobby-animal">➕</div><div><div class="lobby-name">等待加入</div><div class="lobby-meta">冒險席位 ${i+1}</div></div>`;
       list.appendChild(div);
     }
+    list.querySelectorAll('[data-remove-bot]').forEach(btn=>btn.addEventListener('click',()=>{
+      btn.disabled=true;
+      request('removeBot',{botId:btn.dataset.removeBot},ok=>{if(!ok)renderLobby();});
+    }));
     $('host-settings').hidden=!isHost();$('guest-waiting').hidden=isHost();
+    const botCount=state.players.filter(p=>p.isBot).length;
+    $('lobby-bot-count').textContent=`目前 ${botCount} 位機器人 · ${6-state.players.length} 個空位`;
+    $('add-bot-btn').disabled=state.players.length>=6;
     $('start-btn').disabled=state.players.length<2;
     const setting=state.settings||{rounds:'unlimited',money:900,questionSeconds:120,durationMinutes:30};
     const cards=[
@@ -797,7 +809,7 @@
   function renderScoreboard(){
     const el=$('scoreboard');
     const ranking=[...state.players].sort((a,b)=>wealth(b)-wealth(a)||b.correct-a.correct);
-    el.innerHTML=ranking.map((p,i)=>`<div class="score-row${p.id===me?' me':''}" style="${colorStyle(p)}"><div class="score-place">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div><div class="score-avatar">${animalHtml(p.animal)}</div><div class="score-content"><div class="score-name"><span class="person-color-dot"></span>${esc(p.name)} <small>${colorFor(p).name}</small>${titleText(p)?'<span class="rank-title">'+esc(titleText(p))+'</span>':''}${p.host?' 👑':''}${!p.connected?' 🔌':''}${p.id===me?'（我）':''}</div><div class="score-detail">💵 現金 <b>${money(p.cash)}</b>　🏠 房產 <b>${money(landValue(p))}</b>（${p.properties.length} 處）</div><div class="score-detail">答對 ${p.correct}/${p.attempted} 題</div></div><div class="score-money"><small>總資產</small><strong>${money(wealth(p))}</strong></div></div>`).join('');
+    el.innerHTML=ranking.map((p,i)=>`<div class="score-row${p.id===me?' me':''}" style="${colorStyle(p)}"><div class="score-place">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div><div class="score-avatar">${animalHtml(p.animal)}</div><div class="score-content"><div class="score-name"><span class="person-color-dot"></span>${esc(p.name)} <small>${colorFor(p).name}</small>${titleText(p)?'<span class="rank-title">'+esc(titleText(p))+'</span>':''}${p.host?' 👑':''}${p.isBot?' 🤖 BOT':''}${!p.connected&&!p.isBot?' 🔌':''}${p.id===me?'（我）':''}</div><div class="score-detail">💵 現金 <b>${money(p.cash)}</b>　🏠 房產 <b>${money(landValue(p))}</b>（${p.properties.length} 處）</div><div class="score-detail">答對 ${p.correct}/${p.attempted} 題</div></div><div class="score-money"><small>總資產</small><strong>${money(wealth(p))}</strong></div></div>`).join('');
   }
   function renderLog(){
     const current=state.log?.[0]?.id;
@@ -885,7 +897,7 @@
     ).join('');
   }
   function renderEnd(){
-    $('end-rankings').innerHTML=state.rankings.map((r,i)=>`<div class="end-row" style="${colorStyle(r)}"><strong>${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</strong><span class="avatar">${animalHtml(r.animal)}</span><div><strong><span class="person-color-dot"></span>${esc(r.name)}（${colorFor(r).name}）</strong><div class="end-stats">${r.titleId?esc(badgeFor(r.titleId)?.icon+' '+badgeFor(r.titleId)?.title)+' · ':''}現金 ${money(r.cash)} ＋ 房產 ${money(r.landValue)} · 答對 ${r.correct}/${r.attempted}</div></div><div class="end-amount">${money(r.score)}</div></div>`).join('');
+    $('end-rankings').innerHTML=state.rankings.map((r,i)=>`<div class="end-row" style="${colorStyle(r)}"><strong>${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</strong><span class="avatar">${animalHtml(r.animal)}</span><div><strong><span class="person-color-dot"></span>${esc(r.name)}${r.isBot?' 🤖 BOT':''}（${colorFor(r).name}）</strong><div class="end-stats">${r.titleId?esc(badgeFor(r.titleId)?.icon+' '+badgeFor(r.titleId)?.title)+' · ':''}現金 ${money(r.cash)} ＋ 房產 ${money(r.landValue)} · 答對 ${r.correct}/${r.attempted}</div></div><div class="end-amount">${money(r.score)}</div></div>`).join('');
     renderLearningFeedback();
     renderEndAchievements();
     renderWrittenReflection();
