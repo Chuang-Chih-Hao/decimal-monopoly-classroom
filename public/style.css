@@ -769,3 +769,6 @@
   .circle-diagram svg{max-width:260px}
   .circle-diagram figcaption{font-size:10px}
 }
+
+/* v2.0.0：到格動畫進行時，新的圓形圖章也要隱藏，避免與動畫疊圖。 */
+.board .tile.tile-effect-active > .tile-geometry-mark{visibility:hidden}

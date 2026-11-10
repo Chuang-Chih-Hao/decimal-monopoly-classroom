@@ -670,6 +670,7 @@ test('v2.0.0 圖示支援半徑、直徑、已知圓周長、兩圓、半圓、�
   for(const name of ['.circle-diagram{','.geometry-learning-tile{','.tile-geometry-mark{'])
     assert.ok(css.includes(name),name);
   assert.ok(css.includes('@media(prefers-reduced-motion:reduce)'));
+  assert.ok(css.includes('.board .tile.tile-effect-active > .tile-geometry-mark{visibility:hidden}'),'落點動畫期間新圓形圖章也需隱藏');
 });
 test('v2.0.0 圓形教學圖在答題前不透露正解或計算後的半徑',()=>{
   const start=app.indexOf('function renderCircleDiagram(spec){');
