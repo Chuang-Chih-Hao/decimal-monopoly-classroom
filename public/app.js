@@ -1,4 +1,4 @@
-/* 小數富翁前端：所有資產、擲骰、判分都以伺服器狀態為準。 */
+/* 圓形富翁前端：所有資產、擲骰、判分都以伺服器狀態為準。 */
 (() => {
   'use strict';
   const CLIENT_VERSION='2.0.0';
@@ -711,7 +711,7 @@
     const last=state.lastRoll,who=last?state.players.find(p=>p.id===last.playerId):null;
     const current=activePlayer();
     const description=last?`${esc(who?.name||'玩家')} 擲出 ${last.die} 點！`  :'32 格經典方格棋盤';
-    center.innerHTML=`<div class="center-content"><div class="center-logo">🌴 💰 🎲</div><div class="center-title">小數富翁<br/>探險島</div><div class="center-desc">${description}<br/>買店面・算圓面積・雙人對戰</div><div class="center-turn" style="${colorStyle(current)}">${animalHtml(current?.animal||'🐾')} 現在輪到 ${esc(current?.name||'冒險家')}</div>${last?`<span class="dice-face" aria-label="${last.die} 點">${diceIcons[last.die]}</span>`:''}</div>`;
+    center.innerHTML=`<div class="center-content"><div class="center-logo">🌴 💰 🎲</div><div class="center-title">圓形富翁<br/>探險島</div><div class="center-desc">${description}<br/>買店面・算圓面積・雙人對戰</div><div class="center-turn" style="${colorStyle(current)}">${animalHtml(current?.animal||'🐾')} 現在輪到 ${esc(current?.name||'冒險家')}</div>${last?`<span class="dice-face" aria-label="${last.die} 點">${diceIcons[last.die]}</span>`:''}</div>`;
     board.appendChild(center);
     const focusKey=state.currentPlayerId;
     if(mapFocusKey!==focusKey){
@@ -968,11 +968,11 @@
       }else if(spec.label==='diameter'){
         svg+=diameterLine(160,91,61,'d = '+esc(n(spec.value))+' '+unit);
         description='已知圓形直徑 '+n(spec.value)+spec.unit;
-      }else{
+      }else if(spec.label==='circumference'){
         svg+='<path d="M160 30 A61 61 0 1 1 159.9 30" fill="none" stroke="#f49f4e" stroke-width="4" stroke-dasharray="8 5"/>'
           +'<text x="160" y="94" text-anchor="middle" font-size="15" font-weight="800" fill="#254c59">C = '+esc(n(spec.value))+' '+unit+'</text>';
         description='已知圓周長 '+n(spec.value)+spec.unit+'，未標出半徑';
-      }
+      }else return '';
     }else if(spec.shape==='semicircle'){
       svg='<path d="M99 104 A61 61 0 0 1 221 104 L99 104 Z" fill="#c8e6db" stroke="#299982" stroke-width="3"/>'
         +radiusLine(160,104,61,'r = '+esc(n(spec.value))+' '+unit);
@@ -1201,7 +1201,7 @@
     ).join('');
   }
   function renderEnd(){
-    $('end-title').textContent=state.finishReason==='bankrupt'?'💸 有玩家破產，立即結算！':'小數富翁，正式結算！';
+    $('end-title').textContent=state.finishReason==='bankrupt'?'💸 有玩家破產，立即結算！':'圓形富翁，正式結算！';
     const bankrupt=state.players.find(p=>p.id===state.bankruptPlayerId);
     $('end-reason').textContent=state.finishReason==='bankrupt'
       ?`${bankrupt?.name||'玩家'} 現金歸零，遊戲提前結束。依每人現金＋房產原價計算最終排名。`

@@ -182,9 +182,9 @@ test('前端為地圖格子加入主題風格與專屬到格動畫',()=>{
 });
 
 // 上線前核對：保留原有的格子事件類型與號碼徽章絕對定位。
-test('專屬動畫不應把第 25 格比價站當成休息站，也不覆蓋格子定位',()=>{
+test('專屬動畫不應把第 25 格半徑觀察站當成休息站，也不覆蓋格子定位',()=>{
   const style=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
-  assert.match(app,/25:\{theme:'compare',badge:'精打細算站'/);
+  assert.match(app,/25:\{theme:'compare',badge:'半徑觀察站'/);
   assert.doesNotMatch(app,/25:\{theme:'rest'/);
   assert.match(style,/\.board \.tile>\.tile-icon,\.board \.tile>\.tile-name,\.board \.tile>\.tile-price/);
   assert.doesNotMatch(style,/\.board \.tile>\*:not\(\.tile-ambient\)/);

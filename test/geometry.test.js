@@ -97,13 +97,12 @@ test('新成就依實際圓周長／圓面積學習能力解鎖，舊折扣稱�
   game.join(room.code,'同學','🐈');
   game.start(room,host.id);
   for(const [skill,title] of [['circumference','circumference_master'],['area','area_master']]){
-    const qs=BANK.purchase.filter(q=>q.skill===skill).slice(0,2);
+    const qs=BANK.calc.filter(q=>q.skill===skill).slice(0,2);
     assert.equal(qs.length,2);
     for(const q of qs){
-      room.questionQueues.purchase=[q.id];
-      game.ask(room,'purchase');
+      room.questionQueues.calc=[q.id];
+      game.ask(room,'calc');
       game.answer(room,host.id,room.pending.question.correctIndex);
-      if(room.phase==='buying')game.decideBuy(room,host.id,false);
     }
     assert.ok(host.achievements.includes(title),title);
   }

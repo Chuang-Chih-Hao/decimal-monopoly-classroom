@@ -4,19 +4,19 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#f6efe5" />
-  <meta name="description" content="六年級小數大富翁：5 位學生與房主同時連線，邊玩邊練習小數、折扣、比價與應用題。" />
-  <title>小數富翁探險島｜六年級數學連線大富翁</title>
-  <link rel="stylesheet" href="/style.css?v=1.9.0" />
+  <meta name="description" content="六年級圓周長與圓面積大富翁：5 位學生與房主同時連線，使用圓周率 3.14 練習圓的半徑、直徑、周長、面積與生活應用。" />
+  <title>圓形富翁探險島｜六年級圓周長與圓面積大富翁</title>
+  <link rel="stylesheet" href="/style.css?v=2.0.0" />
   <script src="/socket.io/socket.io.js" defer></script>
-  <script src="/board-layout.js?v=1.9.0" defer></script>
-  <script src="/player-colors.js?v=1.9.0" defer></script>
-  <script src="/sound.js?v=1.9.0" defer></script>
-  <script src="/app.js?v=1.9.0" defer></script>
+  <script src="/board-layout.js?v=2.0.0" defer></script>
+  <script src="/player-colors.js?v=2.0.0" defer></script>
+  <script src="/sound.js?v=2.0.0" defer></script>
+  <script src="/app.js?v=2.0.0" defer></script>
 </head>
 <body>
 <div class="app">
   <header class="app-header">
-    <div class="brand"><span class="brand-logo">🎲</span><div><strong>小數富翁<span class="brand-accent">探險島</span></strong><small>六年級｜小數應用 × 多人挑戰</small></div></div>
+    <div class="brand"><span class="brand-logo">🎲</span><div><strong>圓形富翁<span class="brand-accent">探險島</span></strong><small>六年級｜圓周長 × 圓面積</small></div></div>
     <div class="header-utilities">
       <div class="sound-controls" role="group" aria-label="遊戲音效控制">
         <button id="sound-toggle" type="button" class="sound-toggle" aria-pressed="true" title="切換遊戲音效">🔉 音效開啟</button>
@@ -32,17 +32,17 @@
 
   <section id="entry-screen" class="entry-screen">
     <div class="intro-copy">
-      <div class="eyebrow">✦ 小數應用主題教室 ✦</div>
-      <h1>把小數變成你的<br/><em>致富超能力！</em></h1>
-      <p>擲骰前進、算折扣、拆穿黑心商人，搶購店面挑戰最終 Boss。<br/>32 格經典方格棋盤、雙人快速對決，每一格都藏著新的數學冒險！</p>
-      <div class="feature-tags"><span>🧮 小數四則</span><span>🏷️ 折扣比價</span><span>🏠 買地收租</span><span>⚔️ 剪刀石頭布</span><span>🐉 兩題 Boss</span></div>
+      <div class="eyebrow">✦ 圓周長與圓面積主題教室 ✦</div>
+      <h1>把圓形公式變成<br/><em>冒險超能力！</em></h1>
+      <p>擲骰前進、計算圓周長與圓面積、破解公式陷阱，買下店面並挑戰最終 Boss。<br/>32 格經典方格棋盤、雙人快速對決，每一格都藏著新的圓形數學冒險！所有題目圓周率取 3.14。</p>
+      <div class="feature-tags"><span>📏 圓周長</span><span>🔵 圓面積</span><span>🏠 買地收租</span><span>⚔️ 剪刀石頭布</span><span>🐉 兩題 Boss</span></div>
       <div class="entry-decoration">🐈 <span>🦫</span> 🐼</div>
     </div>
     <div class="entry-form panel">
       <div class="panel-kicker">READY TO PLAY?</div>
       <h2>選好你的冒險角色</h2>
       <label class="field-label" for="player-name">冒險家暱稱</label>
-      <input id="player-name" class="text-input" maxlength="14" placeholder="例如：小數高手" autocomplete="nickname" />
+      <input id="player-name" class="text-input" maxlength="14" placeholder="例如：圓形達人" autocomplete="nickname" />
       <div class="field-label">選擇動物棋子 <small>每隻動物都有自己的代表色，房間內不重複</small></div>
       <div id="animal-picker" class="animal-picker" role="group" aria-label="選擇動物棋子"></div>
       <button id="create-btn" class="btn primary full">👑 我是房主，建立新房間</button>
@@ -80,7 +80,7 @@
     <section id="playing-screen" hidden>
       <div class="play-grid">
         <section class="board-column">
-          <div class="section-head"><div><span class="overline">DECIMAL ISLAND</span><h2>小數富翁地圖</h2></div><div class="game-clock-group"><div id="round-chip" class="round-chip">第 1 輪 · ♾️ 無限輪</div><div id="session-clock" class="session-clock">⏱️ 30:00</div></div></div>
+          <div class="section-head"><div><span class="overline">CIRCLE ISLAND</span><h2>圓形富翁地圖</h2></div><div class="game-clock-group"><div id="round-chip" class="round-chip">第 1 輪 · ♾️ 無限輪</div><div id="session-clock" class="session-clock">⏱️ 30:00</div></div></div>
           <div class="track-tools"><span class="track-instruction">🎲 32 格經典方格棋盤 · 依裝置自動適配起始比例，換人不強制放大；可自行縮放、拖曳或滑動</span><div class="track-zoom" aria-label="棋盤視野控制"><button type="button" class="btn outline small" id="map-overview">全覽</button><button type="button" class="btn outline small" id="map-zoom-out" aria-label="縮小棋盤">−</button><span id="map-zoom-label" class="map-zoom-label" aria-live="polite">100%</span><button type="button" class="btn outline small" id="map-zoom-in" aria-label="放大棋盤">＋</button><button type="button" class="btn outline small" id="map-fullsize">🎯 聚焦目前玩家</button></div></div><div id="board-wrapper" class="board-wrapper" aria-label="棋盤可用滑動或拖曳調整位置"><div id="board" class="board" aria-label="大富翁遊戲棋盤"><div id="board-center" class="board-center"></div></div></div>
           <div class="board-legend"><span><b class="legend-square prop"></b>可購買店面</span><span><b class="legend-square event"></b>答題事件</span><span>🏁 經過起點 +$200</span><span>⚔️ 別人的房產：繳租後雙人加賽</span><span>🚔 監獄：服刑一回合／保釋 $80</span><span>🤝 均付：支付 $120 給其他玩家</span></div>
           <section class="panel history-panel"><h3>📣 冒險紀錄 <small>最新事件置頂</small></h3><div id="history" class="history" aria-live="polite"></div></section>
@@ -103,8 +103,8 @@
     </section>
 
     <section id="end-screen" class="end-screen panel" hidden>
-      <div class="overline">MISSION COMPLETED</div><div class="end-icon">🏆</div><h2 id="end-title">小數富翁，正式結算！</h2><p id="end-reason">用現金＋房產原價計算總資產，答題數據也一起公開。</p><div id="end-rankings" class="end-rankings"></div><section id="end-achievements" class="end-achievements" aria-label="本局冒險成就"></section><section id="learning-feedback" class="learning-feedback" aria-label="我的錯題和常錯題型分析"></section>
-      <section class="reflection" aria-label="數學冒險家文字回饋"><h3>🧠 數學冒險家回饋</h3><p>① 哪一題最有挑戰？你怎麼算出來的？<br/>② 比價和打折時，哪個方法最實用？<br/>③ 下次買房或繳租，你會改變什麼策略？</p><label class="reflection-label" for="reflection-input">✍️ 寫下這次的學習心得</label><textarea id="reflection-input" maxlength="600" rows="5" placeholder="例如：我最難的是折扣題，原來 7.5 折要先乘 0.75。下次我會先估算再計算。"></textarea><div class="reflection-actions"><span id="reflection-count" class="reflection-count">0 / 600 字</span><button type="button" id="reflection-save" class="btn primary">📩 送出給房主</button></div><p id="reflection-status" class="reflection-status" role="status">只有你和房主能看到這份文字回饋；送出後仍可修改。</p></section><section id="teacher-reflections" class="teacher-reflections" hidden><h3>👑 房主：學生文字回饋總覽</h3><div id="reflection-list"></div></section>
+      <div class="overline">MISSION COMPLETED</div><div class="end-icon">🏆</div><h2 id="end-title">圓形富翁，正式結算！</h2><p id="end-reason">用現金＋房產原價計算總資產，答題數據也一起公開。</p><div id="end-rankings" class="end-rankings"></div><section id="end-achievements" class="end-achievements" aria-label="本局冒險成就"></section><section id="learning-feedback" class="learning-feedback" aria-label="我的錯題和常錯題型分析"></section>
+      <section class="reflection" aria-label="數學冒險家文字回饋"><h3>🧠 數學冒險家回饋</h3><p>① 圓周長與圓面積，你覺得哪一種最容易搞混？<br/>② 題目給直徑時，怎麼算出半徑？<br/>③ 生活中哪裡可以運用圓形的周長或面積？</p><label class="reflection-label" for="reflection-input">✍️ 寫下這次的學習心得</label><textarea id="reflection-input" maxlength="600" rows="5" placeholder="例如：我學到周長是直徑乘 3.14，面積要用半徑乘半徑再乘 3.14。"></textarea><div class="reflection-actions"><span id="reflection-count" class="reflection-count">0 / 600 字</span><button type="button" id="reflection-save" class="btn primary">📩 送出給房主</button></div><p id="reflection-status" class="reflection-status" role="status">只有你和房主能看到這份文字回饋；送出後仍可修改。</p></section><section id="teacher-reflections" class="teacher-reflections" hidden><h3>👑 房主：學生文字回饋總覽</h3><div id="reflection-list"></div></section>
       <button id="restart-btn" class="btn primary" hidden>🔄 原班人馬，再玩一局</button>
     </section>
   </main>
@@ -128,7 +128,7 @@
   </section>
   <div id="event-spotlight" class="event-spotlight" role="status" aria-live="polite" aria-atomic="true" hidden></div>
   <div id="toast" class="toast" role="alert" aria-live="assertive" hidden></div>
-  <footer class="footer">📚 六年級小數應用教學遊戲 <span>·</span> 答錯也能學會，計算才是超能力！</footer>
+  <footer class="footer">📚 六年級圓周長與圓面積教學遊戲 <span>·</span> 記得先分清周長與面積，計算才是超能力！</footer>
 </div>
 </body>
 </html>
