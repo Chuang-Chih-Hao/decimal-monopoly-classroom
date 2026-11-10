@@ -591,7 +591,7 @@ test('v1.8.3 其他長事件也不截斷，且標題與訊息有獨立一致的�
   assert.match(css,/\.event-spotlight \.spotlight-copy \.spotlight-detail\s*\{[^}]*font-size:/);
   assert.match(css,/\.spotlight-detail\s*\{[^}]*overflow-wrap:anywhere/);
   assert.match(css,/@media\(max-width:640px\)\{[^}]*\.event-spotlight \.spotlight-copy \.spotlight-title/);
-  assert.ok(index.includes('/app.js?v=1.9.0'));
+  assert.ok(index.includes('/app.js?v=2.0.0'));
 });
 
 
@@ -640,4 +640,50 @@ test('v1.9.0 歷史回饋只有持房主金鑰者可讀，能搜尋、備份、�
   assert.ok(store.includes('owner_hash=$1'));
   assert.ok(store.includes('ownerHash(key)'));
   assert.doesNotMatch(server,/socket\.emit\('feedbackHistory'/);
+});
+
+test('v2.0.0 圓周長與圓面積主題已完整替換首頁與題型標籤',()=>{
+  assert.ok(index.includes('圓周長與圓面積'));
+  assert.ok(index.includes('圓形富翁'));
+  assert.ok(index.includes('圓周率取 3.14'));
+  assert.ok(index.includes('📏 圓周長'));
+  assert.ok(index.includes('🔵 圓面積'));
+  assert.ok(!index.includes('7.5 折'));
+  for(const title of ['圓形購地考驗','圓周長挑戰','圓面積研究所','雙圓比較','公式陷阱'])
+    assert.ok(app.includes(title),title);
+});
+test('v2.0.0 圖示支援半徑、直徑、已知圓周長、兩圓、半圓、圓環與正方形內切圓',()=>{
+  const start=app.indexOf('function renderCircleDiagram(spec){');
+  const end=app.indexOf('  function renderQuestion(){',start);
+  assert.ok(start>0&&end>start);
+  const diagram=app.slice(start,end);
+  for(const shape of ['circle','semicircle','pair','ring','square-circle'])
+    assert.ok(diagram.includes("'"+shape+"'"),shape);
+  for(const label of ["'radius'","'diameter'","'circumference'"])
+    assert.ok(diagram.includes(label),label);
+  assert.ok(diagram.includes('未標出半徑'));
+  assert.ok(app.includes('renderCircleDiagram(p.question.diagram)'));
+  assert.ok(app.includes('renderCircleDiagram(r.questionDiagram)'));
+  assert.ok(app.includes('class="tile-geometry-mark"'));
+  assert.ok(app.includes('geometry-learning-tile'));
+  const css=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
+  for(const name of ['.circle-diagram{','.geometry-learning-tile{','.tile-geometry-mark{'])
+    assert.ok(css.includes(name),name);
+  assert.ok(css.includes('@media(prefers-reduced-motion:reduce)'));
+});
+test('v2.0.0 圓形教學圖在答題前不透露正解或計算後的半徑',()=>{
+  const start=app.indexOf('function renderCircleDiagram(spec){');
+  const end=app.indexOf('  function renderQuestion(){',start);
+  const builder=new Function('esc',app.slice(start,end)+'\nreturn renderCircleDiagram;')(
+    text=>String(text).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))
+  );
+  const inverse=builder({shape:'circle',label:'circumference',value:62.8,unit:'公分'});
+  assert.ok(inverse.includes('C = 62.8'));
+  assert.ok(!inverse.includes('r = 10'));
+  assert.ok(!inverse.includes('半徑 10'));
+  const normal=builder({shape:'circle',label:'radius',value:5,unit:'公分'});
+  assert.ok(normal.includes('r = 5'));
+  const area=builder({shape:'square-circle',label:'radius',value:7,unit:'公分'});
+  assert.ok(area.includes('正方形內切圓'));
+  assert.equal(builder({shape:'unknown',value:7,unit:'公分'}),'');
 });

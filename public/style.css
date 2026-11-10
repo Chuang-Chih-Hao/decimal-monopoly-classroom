@@ -740,3 +740,32 @@
   .history-session summary{padding:11px}
   .jail-actions{flex-direction:column}
 }
+
+/* v2.0.0：圓周長／圓面積教學題附圖，和地圖圓形學習格 */
+.circle-diagram{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  width:100%;max-width:440px;margin:10px auto 16px;padding:10px 8px;
+  background:linear-gradient(145deg,#eefbf7,#f6f9ff);
+  border:1px solid #b9ded5;border-radius:15px;box-sizing:border-box
+}
+.circle-diagram svg{display:block;width:min(100%,340px);height:auto;max-height:190px}
+.circle-diagram figcaption{
+  margin:4px 3px 1px;text-align:center;font-size:11px;font-weight:750;
+  line-height:1.7;color:#38546a;overflow-wrap:anywhere
+}
+.result-question .circle-diagram{background:#f1fcf7;margin-top:8px;margin-bottom:10px}
+.geometry-learning-tile{background-image:radial-gradient(circle at 50% 29%,rgba(137,209,192,.22),transparent 55%)}
+.geometry-learning-tile .tile-icon{position:relative;z-index:1}
+.tile-geometry-mark{
+  position:absolute;right:7px;bottom:4px;display:block;
+  width:18px;height:18px;line-height:18px;text-align:center;
+  color:#2c9f91;opacity:.6;font-size:14px;pointer-events:none;
+  animation:circleTilePulse 3.5s ease-in-out infinite
+}
+@keyframes circleTilePulse{0%,100%{transform:scale(.93);opacity:.35}50%{transform:scale(1.08);opacity:.65}}
+@media(prefers-reduced-motion:reduce){.tile-geometry-mark{animation:none}}
+@media(max-width:650px){
+  .circle-diagram{padding:8px 4px;border-radius:12px}
+  .circle-diagram svg{max-width:260px}
+  .circle-diagram figcaption{font-size:10px}
+}

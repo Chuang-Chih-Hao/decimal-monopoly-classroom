@@ -17,7 +17,7 @@ const httpServer=http.createServer(app);
 const io=new Server(httpServer,{maxHttpBufferSize:10_000, transports:['websocket','polling']});
 const games=new GameManager();
 app.disable('x-powered-by');
-app.get('/health',(_req,res)=>res.json({ok:true,game:'小數大富翁',questions:TOTAL}));
+app.get('/health',(_req,res)=>res.json({ok:true,game:'圓形富翁探險島',questions:TOTAL}));
 app.get('/api/info',(_req,res)=>res.json({animals:ANIMALS,questions:TOTAL,maxPlayers:6}));
 // 使用 no-store 確保已開啟的舊分頁能偵測新部署版本。
 app.get('/api/client-version',(_req,res)=>res.set('Cache-Control','no-store').json({version:APP_VERSION}));

@@ -1,409 +1,117 @@
 'use strict';
-
-// 只在伺服器載入答案。前端只接收題目、選項與作答期限。
-const BANK = {};
-function add(type, question, answer, a, b, c, explanation) {
-  (BANK[type] ??= []).push({
-    id: `${type}-${(BANK[type]?.length ?? 0) + 1}`,
-    type, question, answer: String(answer),
-    distractors: [String(a), String(b), String(c)], explanation
-  });
-}
-
-// 每一道都要求理解小數金額、除法或乘法，不只死記公式。
-add('purchase','一本筆記本 12.5 元，買 4 本需要多少元？','50 元','48 元','16.5 元','500 元','12.5 × 4 = 50（元）。');
-add('purchase','3 枝原子筆共 37.5 元，平均每枝多少元？','12.5 元','11.5 元','112.5 元','1.25 元','37.5 ÷ 3 = 12.5（元）。');
-add('purchase','每公尺緞帶 16.8 元，買 2.5 公尺要多少元？','42 元','33.6 元','19.3 元','420 元','16.8 × 2.5 = 42（元）。');
-add('purchase','一袋米 2.5 公斤共 175 元，每公斤多少元？','70 元','43.75 元','437.5 元','7 元','175 ÷ 2.5 = 70（元／公斤）。');
-add('purchase','一盒彩色筆 48.6 元，兩盒共多少元？','97.2 元','96.12 元','50.6 元','9.72 元','48.6 × 2 = 97.2（元）。');
-add('purchase','飲料每瓶 22.5 元，買 6 瓶要多少元？','135 元','130 元','28.5 元','13.5 元','22.5 × 6 = 135（元）。');
-add('purchase','1.2 公斤蘋果 90 元，1 公斤是多少元？','75 元','108 元','88.8 元','7.5 元','90 ÷ 1.2 = 75（元）。');
-add('purchase','一張貼紙 3.75 元，8 張多少元？','30 元','24 元','300 元','11.75 元','3.75 × 8 = 30（元）。');
-add('purchase','餅乾 0.8 公斤賣 64 元，每公斤賣多少元？','80 元','51.2 元','8 元','63.2 元','64 ÷ 0.8 = 80（元）。除以小於 1 的數，商會比被除數大。');
-add('purchase','一組積木 125.5 元，買 2 組，找回 49 元，原本付多少元？','300 元','251 元','202 元','349 元','125.5 × 2 + 49 = 300（元）。');
-
-add('calc','4.8 ÷ 0.6 = ？','8','0.8','80','2.88','同乘 10，48 ÷ 6 = 8。');
-add('calc','7.5 × 0.4 = ？','3','30','0.3','7.9','75 × 4 = 300，小數位共兩位，所以是 3。');
-add('calc','12.6 ÷ 0.3 = ？','42','4.2','420','3.78','126 ÷ 3 = 42。');
-add('calc','3.25 × 4 = ？','13','1.3','130','7.25','3.25 × 4 = 13。');
-add('calc','18.9 − 7.65 = ？','11.25','11.35','12.25','10.25','小數點對齊：18.90 − 7.65 = 11.25。');
-add('calc','2.4 × 1.5 = ？','3.6','36','0.36','4.1','2.4 × (1 + 0.5) = 2.4 + 1.2 = 3.6。');
-add('calc','0.75 ÷ 0.25 = ？','3','0.3','30','1.5','0.25 有 3 個，合起來是 0.75。');
-add('calc','6.08 + 4.7 = ？','10.78','10.15','10.75','1.078','6.08 + 4.70 = 10.78。');
-add('calc','14.4 ÷ 1.2 = ？','12','1.2','120','17.28','144 ÷ 12 = 12。');
-add('calc','0.36 ÷ 0.09 = ？','4','0.4','40','0.027','0.09 × 4 = 0.36。');
-add('calc','8.4 ÷ 0.7 = ？','12','1.2','120','5.88','84 ÷ 7 = 12。');
-add('calc','5.6 × 0.25 = ？','1.4','14','0.14','2.8','乘以 0.25 就是除以 4，5.6 ÷ 4 = 1.4。');
-
-add('discount','200 元打 8 折，結帳多少元？','160 元','180 元','40 元','20 元','8 折是原價的 0.8 倍：200 × 0.8 = 160。');
-add('discount','原價 350 元打 9 折，省了多少元？','35 元','315 元','31.5 元','350 元','省下 1 折，也就是 350 × 0.1 = 35 元。');
-add('discount','定價 480 元打 7.5 折（付原價的 75%），售價多少元？','360 元','400 元','120 元','375 元','480 × 0.75 = 360。');
-add('discount','一件外套 600 元打 85 折，折扣後多少元？','510 元','90 元','540 元','585 元','600 × 0.85 = 510。');
-add('discount','原價 250 元、特價 200 元，相當於打幾折？','8 折','2 折','9 折','7.5 折','200 ÷ 250 = 0.8，也就是 8 折。');
-add('discount','原價 120 元，先打 9 折，實付多少元？','108 元','12 元','110 元','90 元','120 × 0.9 = 108。');
-add('discount','一份點心原價 80 元，現在打 7.5 折（表示只要付原價的 75%）。請問比原價省下多少元？','20 元','60 元','25 元','15 元','7.5 折代表付原價的 75%，也就是 0.75 倍；不是減掉 7.5 元。① 折後售價：80 × 0.75 = 60（元）。② 省下金額：80 − 60 = 20（元）。也可以算 80 × (1 − 0.75) = 80 × 0.25 = 20（元）。題目問「省多少」，所以選 20 元，不是售價 60 元。');
-add('discount','書包原價 900 元，特價 810 元，折數是多少？','9 折','1 折','81 折','8 折','810 ÷ 900 = 0.9 = 9 折。');
-add('discount','原價 360 元，打 8 折後再折 10 元，應付多少元？','278 元','278.8 元','288 元','270 元','360 × 0.8 − 10 = 278（元）。');
-add('discount','商品 150 元買兩件，第 2 件 5 折，共付多少元？','225 元','150 元','300 元','200 元','150 + 150 × 0.5 = 225（元）。');
-
-add('compare','甲瓶 1.5 公升賣 45 元，乙瓶 2 公升賣 56 元，哪個單價較便宜？','乙瓶：28 元／公升','甲瓶：25 元／公升','兩瓶一樣','甲瓶：30 元／公升，較便宜','甲：45 ÷ 1.5 = 30；乙：56 ÷ 2 = 28，所以乙便宜。');
-add('compare','甲包餅乾 0.5 公斤 60 元，乙包 0.8 公斤 88 元，哪包每公斤較便宜？','乙包','甲包','兩包一樣','無法比較','甲每公斤 120；乙每公斤 110，所以乙便宜。');
-add('compare','A 店 3 支筆 36 元，B 店 5 支筆 55 元，哪店每支較便宜？','B 店','A 店','一樣便宜','需知道筆的長度','A：12 元／支；B：11 元／支。');
-add('compare','甲果汁 600 mL 24 元，乙果汁 900 mL 45 元，哪個每 100 mL 較便宜？','甲果汁','乙果汁','一樣','無法比較','甲每 100 mL 4 元，乙每 100 mL 5 元。');
-add('compare','A 米 2 公斤 150 元，B 米 3 公斤 210 元，哪個每公斤便宜？','B 米','A 米','一樣','A 米便宜 5 元','A 每公斤 75，B 每公斤 70。');
-add('compare','甲衛生紙 8 包 104 元，乙 12 包 144 元，哪個每包較便宜？','乙','甲','一樣','甲便宜 2 元','甲每包 13 元；乙每包 12 元。');
-add('compare','同款橡皮擦 A 店 4 個 50 元，B 店 6 個 72 元，每個較便宜的是？','B 店','A 店','一樣','A 每個 10 元','A 每個 12.5 元；B 每個 12 元。');
-add('compare','A 店 1.2 公斤水果 96 元，B 店 1.5 公斤 112.5 元，哪家較便宜？','B 店','A 店','一樣','A 每公斤 75 元','A 每公斤 80 元；B 每公斤 75 元。');
-add('compare','甲牛奶 1.25 公升 75 元，乙牛奶 1.5 公升 84 元，誰的每公升單價低？','乙牛奶','甲牛奶','一樣','兩者都 60 元','甲 60 元／公升；乙 56 元／公升。');
-add('compare','2.5 公尺繩子賣 45 元，4 公尺賣 68 元，哪一條每公尺便宜？','4 公尺那條','2.5 公尺那條','同價','不能用除法比較','短的每公尺 18 元，長的每公尺 17 元。');
-
-add('scam','黑心商人說：「200 元打 8 折只要 180 元！」正確價格是多少？','160 元','180 元','120 元','80 元','200 × 0.8 = 160。');
-add('scam','老闆說：「0.5 公斤 50 元，比 1 公斤 90 元便宜！」哪句正確？','1 公斤 90 元的每公斤單價較低','0.5 公斤那包較划算','兩者相同','兩者都每公斤 50 元','0.5 公斤的單價是 100 元／公斤，比 90 元高。');
-add('scam','店員說：「30.6 ÷ 0.3 = 10.2。」真正答案是？','102','10.2','1.02','9.18','306 ÷ 3 = 102。');
-add('scam','原價 400 元打 9 折，店員要收 390 元。正確應付多少？','360 元','390 元','40 元','310 元','400 × 0.9 = 360。');
-add('scam','黑心商人的標籤寫著「原價 80 元，打 7.5 折後只要 70 元！」。已知 7.5 折就是付原價的 75%，實際應付多少元？','60 元','70 元','75 元','20 元','7.5 折＝原價的 75%＝0.75 倍。80 × 0.75 = 60（元），所以真正售價是 60 元；80 − 60 = 20（元）是省下的錢，不是應付金額。標籤寫 70 元，多收了 10 元。');
-add('scam','老闆說：「0.8 × 0.4 = 3.2。」實際等於？','0.32','3.2','32','1.2','8 × 4 = 32，兩個因數共兩位小數，得 0.32。');
-add('scam','商品價格從 100 元降到 85 元，老闆說「只降 5 元」。實際降了？','15 元','5 元','85 元','1.5 元','100 − 85 = 15（元）。');
-add('scam','一盒 12 顆糖賣 72 元，老闆說「每顆 7 元」。實際每顆？','6 元','7 元','5 元','8 元','72 ÷ 12 = 6。');
-add('scam','兩瓶飲料各 32.5 元，商人說共 75 元。正確總價？','65 元','75 元','64 元','6.5 元','32.5 × 2 = 65。');
-
-add('chest','寶箱密碼：2.5 × 8 = ？','20','2','200','10.5','2.5 × 8 = 20。');
-add('chest','寶箱密碼：9.6 ÷ 1.2 = ？','8','0.8','80','11.52','96 ÷ 12 = 8。');
-add('chest','寶箱密碼：0.75 × 100 = ？','75','7.5','0.075','750','小數點向右移動兩位。');
-add('chest','寶箱密碼：25.5 + 14.75 = ？','40.25','39.25','40.3','10.75','25.50 + 14.75 = 40.25。');
-add('chest','寶箱密碼：6 ÷ 0.75 = ？','8','0.8','4.5','80','0.75 × 8 = 6。');
-add('chest','寶箱密碼：4.5 × 0.2 = ？','0.9','9','0.09','4.7','4.5 × 0.2 = 0.9。');
-add('chest','寶箱密碼：12.5 × 0.8 = ？','10','100','1','13.3','12.5 × 8 ÷ 10 = 10。');
-add('chest','寶箱密碼：18.2 − 9.75 = ？','8.45','8.55','9.45','8.75','18.20 − 9.75 = 8.45。');
-
-add('chance','抽中禮券！50 元打 9 折買點心，要付多少元？','45 元','5 元','40 元','55 元','50 × 0.9 = 45。');
-add('chance','校外教學買 2.4 公升果汁，1 公升 35 元，合計？','84 元','37.4 元','80 元','8.4 元','2.4 × 35 = 84。');
-add('chance','你發現找零有誤：付 200 元買 138.5 元商品，應找？','61.5 元','62.5 元','71.5 元','338.5 元','200 − 138.5 = 61.5。');
-add('chance','愛心義賣，5 份各 26.8 元，收入多少？','134 元','130 元','31.8 元','13.4 元','26.8 × 5 = 134。');
-add('chance','買 3 本各 18.5 元的書，共花多少？','55.5 元','54.5 元','21.5 元','555 元','18.5 × 3 = 55.5。');
-add('chance','購物節：原價 240 元打 7.5 折，應付？','180 元','160 元','60 元','215 元','240 × 0.75 = 180。');
-add('chance','抽獎券 12.5 元一張，4 張共多少？','50 元','16.5 元','40 元','5 元','12.5 × 4 = 50。');
-add('chance','交通卡原有 100 元，搭車花 23.5 元，餘額多少？','76.5 元','77.5 元','123.5 元','86.5 元','100 − 23.5 = 76.5。');
-
-add('fate','下雨需要買傘：每把 75.5 元，兩把多少？','151 元','150 元','77.5 元','15.1 元','75.5 × 2 = 151。');
-add('fate','撿到打折券：原價 180 元打 8 折，售價？','144 元','36 元','160 元','148 元','180 × 0.8 = 144。');
-add('fate','遺失水壺，補買 1.5 公升保溫瓶每公升換算 120 元，總額？','180 元','121.5 元','80 元','18 元','1.5 × 120 = 180。');
-add('fate','便當 95.5 元，帶 150 元買一個，還有？','54.5 元','55.5 元','45.5 元','245.5 元','150 − 95.5 = 54.5。');
-add('fate','要分攤 135 元停車費給 2.5 小時，每小時平均費用？','54 元','337.5 元','54.5 元','5.4 元','135 ÷ 2.5 = 54。');
-add('fate','交通卡 80 元，搭一次車 16.5 元，搭兩次後剩？','47 元','63.5 元','46 元','113 元','80 − 16.5 × 2 = 47。');
-add('fate','三張票，每張 42.5 元，一共多少？','127.5 元','125.5 元','45.5 元','12.75 元','42.5 × 3 = 127.5。');
-add('fate','做餅乾用 0.75 公斤麵粉，每公斤 64 元，花了？','48 元','64.75 元','85.33 元','4.8 元','0.75 × 64 = 48。');
-
-add('boss','Boss 第一關：一商品 600 元打 85 折，再減 30 元，實付？','480 元','510 元','570 元','450 元','600 × 0.85 − 30 = 480。');
-add('boss','Boss 計價：2.5 公斤水果 187.5 元，每公斤？','75 元','75.5 元','468.75 元','18.75 元','187.5 ÷ 2.5 = 75。');
-add('boss','Boss 比較：A 店 2.4 L 72 元，B 店 1.5 L 42 元，哪個較划算？','B 店','A 店','一樣','無法比較','A 每公升 30 元；B 每公升 28 元。');
-add('boss','Boss 應用：原有 500 元，買 3 個各 86.5 元的玩具，剩下？','240.5 元','259.5 元','413.5 元','240 元','500 − 86.5 × 3 = 240.5。');
-add('boss','Boss 第二關：0.48 ÷ 0.06 = ？','8','0.8','80','0.0288','48 ÷ 6 = 8。');
-add('boss','Boss 折扣：600 元打 8 折、加上運費 35 元，總共？','515 元','480 元','635 元','555 元','600 × 0.8 + 35 = 515。');
-add('boss','Boss 補貨：每箱 3.2 公斤，4.5 箱等於幾公斤？','14.4 公斤','7.7 公斤','144 公斤','1.44 公斤','3.2 × 4.5 = 14.4。');
-add('boss','Boss 找零：一組 175.5 元，兩組付 400 元，找回？','49 元','48 元','51 元','351 元','400 − 175.5 × 2 = 49。');
-
-add('rescue','緊急救援：房租 145 元，手上 72.5 元，還缺多少？','72.5 元','73.5 元','217.5 元','70.5 元','145 − 72.5 = 72.5。');
-add('rescue','緊急救援：0.6 × 150 = ？','90','900','9','150.6','6 × 150 ÷ 10 = 90。');
-add('rescue','緊急救援：超支 125.5 元，收到 200 元，剩下？','74.5 元','75.5 元','325.5 元','84.5 元','200 − 125.5 = 74.5。');
-add('rescue','緊急救援：48 ÷ 0.8 = ？','60','6','38.4','600','480 ÷ 8 = 60。');
-add('rescue','緊急救援：3.5 × 20 = ？','70','7','700','23.5','3.5 × 2 × 10 = 70。');
-add('rescue','緊急救援：180 元打 7.5 折，付款？','135 元','45 元','150 元','140 元','180 × 0.75 = 135。');
-add('rescue','緊急救援：12.5 ÷ 0.5 = ？','25','6.25','2.5','250','125 ÷ 5 = 25。');
-add('rescue','緊急救援：5 公斤米共 362.5 元，每公斤？','72.5 元','73 元','1812.5 元','36.25 元','362.5 ÷ 5 = 72.5。');
-
-// v1.2 逐題補全情境、所求量與單位；維持原本經過檢驗的答案與選項。
-const detailedPrompts = {
-  purchase: [
-    '文具店一本筆記本售價 12.5 元。小明買了 4 本同款筆記本，沒有其他折扣或費用。請問他總共應付多少元？',
-    '文具店把 3 枝同款原子筆合售 37.5 元，假設每枝價格相同。請問平均每枝原子筆多少元？',
-    '緞帶每 1 公尺售價 16.8 元，可以依長度購買。小華買了 2.5 公尺，沒有其他費用。請問總價是多少元？',
-    '米店一袋白米重 2.5 公斤，整袋售價 175 元。假設每公斤價格相同，請問平均每公斤多少元？',
-    '一盒彩色筆售價 48.6 元。買 2 盒完全相同的彩色筆，沒有打折，請問總共需要多少元？',
-    '飲料每瓶售價 22.5 元，小美一次購買 6 瓶同款飲料。請問結帳時總共需要多少元？',
-    '水果攤把 1.2 公斤蘋果賣 90 元，假設重量與價格成正比。請問平均每 1 公斤蘋果賣多少元？',
-    '商店每張貼紙 3.75 元，小美買了 8 張相同貼紙。請問應付的總金額是多少元？',
-    '一包餅乾重 0.8 公斤，價格是 64 元。假設每公斤單價相同，請問換算成每 1 公斤是多少元？',
-    '玩具店每組積木售價 125.5 元。小明買了 2 組，店員找給他 49 元。請問小明原本拿出多少元付款？'
-  ],
-  calc: [
-    '小數神算：把 4.8 平均分成每份 0.6，總共可以分成幾份？請計算 4.8 ÷ 0.6。',
-    '小數神算：求 7.5 的 0.4 倍是多少。請計算 7.5 × 0.4，選出正確數值。',
-    '小數神算：每份是 0.3，把 12.6 分成相同大小的份數。請計算 12.6 ÷ 0.3。',
-    '小數神算：每份長 3.25 公尺，共有 4 份。總長度是多少公尺？請計算 3.25 × 4。',
-    '小數神算：原有 18.9 公升果汁，喝掉 7.65 公升。還剩多少公升？請計算 18.9 − 7.65。',
-    '小數神算：一條繩子長 2.4 公尺，另一條長度是它的 1.5 倍。另一條長多少公尺？',
-    '小數神算：每杯倒 0.25 公升果汁，現有 0.75 公升。可以倒滿多少杯？請計算 0.75 ÷ 0.25。',
-    '小數神算：A 杯有 6.08 公升果汁，B 杯有 4.7 公升。合起來共有多少公升？',
-    '小數神算：長 14.4 公尺的緞帶，每 1.2 公尺剪成一段，可以剪出幾段完整緞帶？',
-    '小數神算：每份 0.09 公斤的點心，現在有 0.36 公斤。共可以分成幾份？',
-    '小數神算：有 8.4 公升的飲料，每瓶裝 0.7 公升。最多可以裝滿幾瓶？',
-    '小數神算：計算 5.6 的四分之一，也就是 5.6 × 0.25。請選出正確數值。'
-  ],
-  discount: [
-    '一件商品原價 200 元，商店標示「打 8 折」，意思是付原價的 80%，而不是減 80 元。請問折後實際應付多少元？',
-    '一件商品原價 350 元，商店打 9 折（付原價的 90%）。題目問的是「省下多少元」，不是折後售價，請問省下多少元？',
-    '一個書包原價 480 元，現在打 7.5 折，意思是售價為原價的 75%（0.75 倍）。請問折扣後應付多少元？',
-    '一件外套原價 600 元，現在打 85 折，意思是付原價的 85%（0.85 倍）。請問折後售價是多少元？',
-    '一件商品原價 250 元，特價只賣 200 元。折數代表「售價占原價的比例」，請問這次特價相當於打幾折？',
-    '一份點心原價 120 元，店家先打 9 折（只付原價的 90%），沒有其他折價券。請問實際應付多少元？',
-    '一份點心原價 80 元，現在打 7.5 折，也就是只付原價的 75%（0.75 倍）。題目問「比原價省下多少元」，不是問折後售價。請問省了多少元？',
-    '書包原價 900 元，現在特價 810 元。請用「售價 ÷ 原價」計算付款比例，再換算成折數；請問打幾折？',
-    '一件商品原價 360 元，先打 8 折（付原價的 80%），結帳時再減 10 元。兩項優惠依序使用，最後需付多少元？',
-    '一件商品原價 150 元，購買兩件時第一件原價、第二件打 5 折（付半價）。請問兩件總共應付多少元？'
-  ],
-  compare: [
-    '同款飲料有兩種容量：甲瓶 1.5 公升 45 元，乙瓶 2 公升 56 元。若只比較「每 1 公升多少元」，哪一瓶單價比較便宜？',
-    '同款餅乾甲包 0.5 公斤售價 60 元，乙包 0.8 公斤售價 88 元。先換算兩包「每 1 公斤」的單價，再選較便宜者。',
-    'A 店同款筆 3 支賣 36 元，B 店 5 支賣 55 元。假設品質相同，請比較每 1 支筆的價錢，哪家比較便宜？',
-    '甲果汁每瓶 600 毫升 24 元，乙果汁每瓶 900 毫升 45 元。請換算成每 100 毫升多少元，哪一種比較便宜？',
-    '相同品質的白米，A 店 2 公斤 150 元，B 店 3 公斤 210 元。請比較每 1 公斤的價格，哪家比較便宜？',
-    '同規格衛生紙，甲組 8 包 104 元，乙組 12 包 144 元。請比較每 1 包的平均價格，哪組較便宜？',
-    '同款橡皮擦，A 店 4 個共 50 元，B 店 6 個共 72 元。請比較每 1 個橡皮擦的價格，哪店較便宜？',
-    '同款水果 A 店 1.2 公斤售 96 元，B 店 1.5 公斤售 112.5 元。請比較每 1 公斤的價格，哪店較便宜？',
-    '同款牛奶甲瓶 1.25 公升售 75 元，乙瓶 1.5 公升售 84 元。請比較每 1 公升的單價，哪瓶比較低？',
-    '同材質繩子一條長 2.5 公尺賣 45 元，另一條長 4 公尺賣 68 元。若只比較每 1 公尺價格，哪條比較便宜？'
-  ],
-  scam: [
-    '黑心商人宣稱：「一件原價 200 元的商品打 8 折，要付 180 元。」但 8 折是只付原價 80%。請問正確折後售價是多少元？',
-    '老闆說：「0.5 公斤 50 元比 1 公斤 90 元更划算。」請把兩種商品換算成每 1 公斤單價，再判斷哪一個較便宜。',
-    '黑心商人把 30.6 ÷ 0.3 算成 10.2。請用小數除法重新計算，哪個才是正確的商？',
-    '一件商品原價 400 元，打 9 折（付 90%），店員卻要收 390 元。請問正確的折後售價應是多少元？',
-    '黑心商人標示：「原價 80 元，打 7.5 折後只要 70 元！」已知 7.5 折是付原價的 75%（0.75 倍）。題目問正確「應付售價」，不是省下的錢。請問應付多少元？',
-    '老闆說：「0.8 × 0.4 = 3.2。」請自行計算小數乘法，確認正確的乘積是多少。',
-    '一件商品原價 100 元，現在降為 85 元，老闆卻說「只降 5 元」。請用原價減新價格，求真正降價多少元。',
-    '一盒糖有 12 顆，整盒賣 72 元，老闆說「平均每顆 7 元」。請計算每顆的實際平均售價。',
-    '兩瓶完全相同的飲料每瓶售價 32.5 元，商人說買兩瓶要 75 元。請自己計算正確總價是多少元。'
-  ],
-  chest: [
-    '神祕寶箱上有一道小數乘法密碼：2.5 × 8。算出正確數值才能打開寶箱。',
-    '神祕寶箱需要輸入運算結果：9.6 ÷ 1.2。請選出正確數字，注意除數也是小數。',
-    '神祕寶箱的密碼是 0.75 × 100 的結果。把小數乘以 100，請問密碼應是幾？',
-    '神祕寶箱需要把 25.5 與 14.75 相加。請對齊小數位，算出正確密碼。',
-    '神祕寶箱的解鎖密碼是 6 ÷ 0.75 的商，請用小數除法算出正確數值再選答案。',
-    '神祕寶箱的密碼是 4.5 × 0.2 的結果，注意答案可能小於 4.5。',
-    '神祕寶箱的密碼是 12.5 × 0.8 的結果，請先理解乘以 0.8 的意義再作答。',
-    '神祕寶箱的密碼是 18.2 − 9.75，請先將 18.2 寫成 18.20 再相減。'
-  ],
-  chance: [
-    '你在園遊會抽到購物券。一份點心原價 50 元，使用券後打 9 折（付原價的 90%）。請問應付多少元？',
-    '校外教學要購買果汁，每 1 公升售價 35 元，班上買了 2.4 公升。請問總共需要多少元？',
-    '你在商店買了一件 138.5 元的商品，付給店員 200 元且沒有其他費用。請問正確應找回多少元？',
-    '愛心義賣每份點心定價 26.8 元，總共賣出 5 份同款點心。請問義賣收入一共多少元？',
-    '書展每本書都賣 18.5 元，你買了 3 本同價的書。請問買書一共花多少元？',
-    '購物節一件商品原價 240 元，打 7.5 折（付 75%）。請問折後應付多少元，不是省下多少元？',
-    '活動入場抽獎券一張 12.5 元，小明買了 4 張。請問總共需要付多少元？',
-    '交通卡原先有 100 元，今天只搭了一趟需付 23.5 元的車。請問卡片餘額剩多少元？'
-  ],
-  fate: [
-    '下雨時你幫兩位同學各買一把雨傘，每把售價 75.5 元，共買 2 把。請問總共花多少元？',
-    '你撿到一張折扣券，一件商品原價 180 元，使用後打 8 折（付原價的 80%）。請問折後售價是多少元？',
-    '露營時要買果汁，一共購買 1.5 公升，商店每 1 公升賣 120 元，依實際容量計價。請問一共要付多少元？',
-    '你帶了 150 元去買一個 95.5 元的便當，沒有買其他東西。請問買完後還剩多少元？',
-    '停車 2.5 小時總共收費 135 元，假設每小時收費相同。請問平均每 1 小時停車費是多少元？',
-    '交通卡原有 80 元，今天搭兩趟車，每趟都扣 16.5 元。請問搭完兩趟車後卡片餘額多少元？',
-    '電影院同款票每張 42.5 元，你買了 3 張。請問三張票一共需要付多少元？',
-    '做餅乾需要 0.75 公斤麵粉，麵粉每 1 公斤售價 64 元，依重量計費。請問麵粉花了多少元？'
-  ],
-  boss: [
-    'Boss 連續挑戰：一件商品原價 600 元，先打 85 折（付 85%），結帳時再折抵 30 元。請依照優惠順序算出最後應付多少元。',
-    'Boss 單價挑戰：水果 2.5 公斤共售 187.5 元，假設每公斤價格相同。平均每 1 公斤水果是多少元？',
-    'Boss 比價挑戰：同款飲料 A 店 2.4 公升售 72 元，B 店 1.5 公升售 42 元。比較每 1 公升的價格，哪家較便宜？',
-    'Boss 找零挑戰：你原有 500 元，購買 3 個玩具，每個售價 86.5 元，沒有打折。請問還剩多少元？',
-    'Boss 小數除法：一共有 0.48 公斤糖，若每份分成 0.06 公斤，能分成幾份？請計算 0.48 ÷ 0.06。',
-    'Boss 折扣加運費：商品原價 600 元，先打 8 折（付 80%），另收 35 元運費，請問最後一共要付多少元？',
-    'Boss 補貨挑戰：每整箱貨物重 3.2 公斤，商店允許拆箱購買半箱。你買 4.5 箱（4 箱半），共重多少公斤？',
-    'Boss 找零挑戰：一組積木 175.5 元，購買兩組後拿出 400 元付款。請問店員應找回多少元？'
-  ],
-  rescue: [
-    '緊急救援：你需要支付 145 元房租，現在只有 72.5 元。請問還差多少元才夠支付房租？',
-    '緊急救援：一筆金額是 150 元，現在需要它的 0.6 倍。請計算 0.6 × 150，選出正確數值。',
-    '緊急救援：你帶了 200 元，買東西花了 125.5 元且沒有其他花費。請問還剩下多少元？',
-    '緊急救援：每份點心重 0.8 公斤，一共有 48 公斤。請計算 48 ÷ 0.8，能分成多少份？',
-    '緊急救援：每份物資價格 3.5 元，班級買了 20 份。請問總共要付多少元？',
-    '緊急救援：一件商品原價 180 元，現在打 7.5 折（付 75%），請問真正應付多少元？不是省下多少元。',
-    '緊急救援：一條緞帶長 12.5 公尺，每 0.5 公尺剪成一段。可以剪出幾段完整緞帶？請計算 12.5 ÷ 0.5。',
-    '緊急救援：5 公斤白米共售 362.5 元，假設每公斤價格相同。請問平均每 1 公斤白米是多少元？'
-  ]
-};
-const explanationGuides = {
-  purchase:'解題提醒：先分清題目要求「總價」、「每單位價格」或「原本付的錢」；注意元、公斤、公尺等單位。',
-  calc:'解題提醒：小數加減要對齊小數點；小數乘除請檢查位值與結果是否合理。',
-  discount:'解題提醒：「打 8 折」表示實付 80%；「打 7.5 折」表示實付 75%。折後售價與省下金額是兩個不同答案。',
-  compare:'解題提醒：先把兩種價格換算成「相同單位」的單價，再選單價較低者。',
-  scam:'解題提醒：先辨認店家的說法，再自行算出正確總價、售價或單位價格；不要只看標籤。',
-  chest:'解題提醒：先列出算式，再利用小數位數或逆運算檢查答案。',
-  chance:'解題提醒：確認題目最後問的是總價、找零、售價還是餘額，再挑選答案。',
-  fate:'解題提醒：把情境中的數量、單價與所求量整理成算式，最後標上正確單位。',
-  boss:'解題提醒：多步驟題要依照先乘除、後加減與題目的優惠先後順序計算。',
-  rescue:'解題提醒：先看清楚目前有多少、需要多少，以及題目問「還差」還是「剩下」。'
-};
-for(const [kind,list] of Object.entries(detailedPrompts)){
-  if(list.length!==BANK[kind].length)throw new Error(`題庫補充數量錯誤：${kind} ${list.length}/${BANK[kind].length}`);
-  BANK[kind].forEach((q,i)=>{
-    q.question=list[i];
-    q.explanation=`解題步驟：${q.explanation} ${explanationGuides[kind]}`;
-  });
-}
-
-// 學習診斷按「數學能力」分類，而不是用機會／寶箱等遊戲格子名稱。
-// 每題只指派一個主要能力；完整列舉以避免新增題目後未被正確分類。
-const SKILLS = Object.freeze({
-  addsub:{name:'小數加減與找零',tip:'將小數點對齊並補零，例如 18.2 可以寫成 18.20；注意題目問「剩下」還是「差多少」。'},
-  multiply:{name:'小數乘法與總價',tip:'先列出單價 × 數量，再檢查小數位數和答案單位；乘上小於 1 的數，結果會變小。'},
-  divide:{name:'小數除法與分裝',tip:'除數是小數時，先讓除數和被除數同乘 10 或 100 變成整數除法，再驗算。'},
-  discount:{name:'折扣、折數與省錢',tip:'打 7.5 折是付原價的 75%；折後售價＝原價 × 0.75，省下的金額＝原價－折後售價。'},
-  unit:{name:'單價換算與比價',tip:'先統一比較單位，例如元／公斤或元／公升；每單位價格＝總價 ÷ 數量，單價較低才划算。'},
-  multi:{name:'多步驟生活應用',tip:'把題目拆成小步驟：先求商品總價或折後價格，再計算找零、加運費或減優惠。'}
+// 2026 第 2 週主題：國小六年級「圓周長與圓面積」。
+// 圓周率統一 3.14；所有數值與干擾選項都從公式建立，不依賴手工填寫答案。
+const PI=3.14;
+const SKILLS=Object.freeze({
+  radius:{name:'半徑與直徑',tip:'直徑是半徑的 2 倍；看到直徑要先除以 2 才能算面積。'},
+  circumference:{name:'圓周長計算',tip:'圓周長＝直徑 × 3.14，或半徑 × 2 × 3.14；周長單位是公分、公尺等長度單位。'},
+  area:{name:'圓面積計算',tip:'圓面積＝半徑 × 半徑 × 3.14；注意是半徑平方，不是直徑平方。面積單位要寫平方公分、平方公尺。'},
+  inverse:{name:'由周長反求半徑',tip:'已知圓周長：先除以 3.14 求直徑，再除以 2 求半徑。'},
+  compare:{name:'兩個圓的周長與面積比較',tip:'先確認要比較周長還是面積；半徑放大 2 倍，周長變 2 倍，面積變 4 倍。'},
+  combined:{name:'半圓與複合圖形',tip:'半圓面積是整圓的一半；半圓的完整周界還要加上直徑。陰影面積通常先算大圖，再減小圖。'}
 });
-const SKILL_ASSIGNMENTS = {
-  purchase:['multiply','unit','multiply','unit','multiply','multiply','unit','multiply','unit','multi'],
-  calc:['divide','multiply','divide','multiply','addsub','multiply','divide','addsub','divide','divide','divide','multiply'],
-  discount:Array(10).fill('discount'),
-  compare:Array(10).fill('unit'),
-  scam:['discount','unit','divide','discount','discount','multiply','addsub','unit','multiply'],
-  chest:['multiply','divide','multiply','addsub','divide','multiply','multiply','addsub'],
-  chance:['discount','multiply','addsub','multiply','multiply','discount','multiply','addsub'],
-  fate:['multiply','discount','multiply','addsub','unit','multi','multiply','multiply'],
-  boss:['multi','unit','unit','multi','divide','multi','multiply','multi'],
-  rescue:['addsub','multiply','addsub','divide','multiply','discount','divide','unit']
-};
-for (const [kind,questions] of Object.entries(BANK)) {
-  const assignments=SKILL_ASSIGNMENTS[kind];
-  if(!assignments||assignments.length!==questions.length)throw new Error(`題型分類數量錯誤：${kind}`);
-  questions.forEach((question,index)=>{
-    const skill=assignments[index];
-    if(!SKILLS[skill])throw new Error(`未知題型分類：${question.id}`);
-    question.skill=skill;
+const KINDS=['purchase','calc','discount','compare','scam','chest','chance','fate','boss','rescue'];
+const BANK=Object.fromEntries(KINDS.map(kind=>[kind,[]]));
+const SCENES=[
+  '星光電影院的圓形招牌','親子咖啡館的圓桌','運動用品店的飛盤','海洋樂園的圓形水池',
+  '森林書店的圓形地毯','文具補給站的圓形貼紙','甜點工坊的圓形蛋糕','動物旅館的圓形遊戲墊',
+  '便利商店的圓形地貼','水果市集的圓形果籃','電子商城的圓形展示臺','玩具王國的圓形玩具',
+  '公園的圓形花圃','校園的圓形跑道','操場的圓形標誌','班級布置的圓形海報',
+  '園遊會的圓形攤位','探險島的圓形廣場','校園的圓形噴泉','森林步道的圓形休息區'
+];
+const round2=value=>Math.round((value+Number.EPSILON)*100)/100;
+const show=value=>String(round2(value));
+const circumference=r=>round2(2*PI*r);
+const area=r=>round2(PI*r*r);
+function numberQuestion(kind,text,value,unit,steps,skill,diagram){
+  const correct=show(value);
+  const candidates=[
+    round2(value*2),round2(value/2),round2(value+PI),round2(value-PI),
+    round2(value*4),round2(value/4),round2(value+2),round2(value+5),
+    round2(value+10),round2(value+1),round2(value-1)
+  ].filter(n=>Number.isFinite(n)&&n>=0&&show(n)!==correct);
+  const distractors=[...new Set(candidates.map(show))].slice(0,3);
+  if(distractors.length!==3)throw new Error('題目干擾選項不夠');
+  BANK[kind].push({
+    id:kind+'-'+(BANK[kind].length+1),type:kind,
+    question:'本題圓周率取 3.14。'+text,
+    answer:correct+' '+unit,
+    distractors:distractors.map(n=>n+' '+unit),
+    explanation:'解題步驟：'+steps+'。解題提醒：'+SKILLS[skill].tip,
+    skill,diagram
   });
 }
-
-// v1.9.0：新增 250 道生活情境變化題。所有數值、選項、答案與解析由固定公式建立，
-// 伺服器直接驗證，避免填寫錯誤答案；每類增加 25 題，總量由 91 增為 341 題。
-const round2=n=>Math.round((n+Number.EPSILON)*100)/100;
-const nice=n=>String(round2(n));
-const contexts=['校園園遊會','便利商店','戶外教學','運動會','社團活動','班級義賣','旅行補給','圖書週'];
-function moreNumber(kind,skill,prompt,answer,formula,unit=' 元'){
-  const num=round2(answer);
-  const display=nice(num)+unit;
-  const wrongNumbers=[round2(num+Math.max(1,round2(Math.abs(num)*.1))),
-    round2(Math.max(0,num-Math.max(1,round2(Math.abs(num)*.15)))),
-    round2(num*10),round2(num/10),round2(num+5),round2(num+2.5)];
-  const distractors=[...new Set(wrongNumbers.map(n=>nice(n)+unit))].filter(x=>x!==display).slice(0,3);
-  if(distractors.length!==3)throw new Error('題目選項不足：'+kind+' '+prompt);
-  const id=kind+'-'+(BANK[kind].length+1);
-  const explanation='解題步驟：'+formula+'。解題提醒：先確認題目問的是金額、數量或單位，再依正確運算順序計算並檢查小數點。';
-  BANK[kind].push({id,type:kind,question:prompt,answer:display,distractors,explanation,skill});
+function choiceQuestion(kind,text,answer,other,steps,skill,diagram){
+  const distractors=[other,'兩個一樣','資料不足，無法比較'];
+  if(new Set([answer,...distractors]).size!==4)throw new Error('比較選項重複');
+  BANK[kind].push({
+    id:kind+'-'+(BANK[kind].length+1),type:kind,
+    question:'本題圓周率取 3.14。'+text,
+    answer,distractors,
+    explanation:'解題步驟：'+steps+'。解題提醒：'+SKILLS[skill].tip,
+    skill,diagram
+  });
 }
-function moreCompare(prompt,unitA,unitB,amountA,amountB){
-  const answer=unitA<unitB?'甲店':'乙店',kind='compare';
-  const id=kind+'-'+(BANK[kind].length+1);
-  BANK[kind].push({id,type:kind,question:prompt,answer,
-    distractors:[answer==='甲店'?'乙店':'甲店','兩店一樣便宜','無法比較'],
-    explanation:'解題步驟：甲店 '+nice(amountA)+' 元，乙店 '+nice(amountB)+' 元；比較相同單位的單價：'+nice(unitA)+' 元與 '+nice(unitB)+' 元，所以選 '+answer+'。解題提醒：不要只看總價，要先統一數量和單位比較。',
-    skill:'unit'});
+function circle(label,value,unit){
+  return {shape:'circle',label,value,unit};
 }
-for(let i=0;i<25;i++){
-  const scene=contexts[i%contexts.length],cycle=i%5,n=i+1;
-  const price=round2(9.5+n*1.25),qty=2+(i%5),unit=round2(8.5+n*.75);
-  const total=round2(price*qty);
-  // 購地：總價、單價、找零、重量、部分優惠
-  if(cycle===0)moreNumber('purchase','multiply',
-    scene+'中，文具攤每份小禮物 '+nice(price)+' 元，小組一次購買 '+qty+' 份，同款同價且沒有折扣。請問總共需要多少元？',
-    total,nice(price)+' × '+qty+' = '+nice(total));
-  if(cycle===1)moreNumber('purchase','unit',
-    scene+'採購中，同款商品 '+qty+' 件共付 '+nice(round2(unit*qty))+' 元，每件價格相同，也沒有其他費用。請問平均每件售價是多少元？',
-    unit,nice(round2(unit*qty))+' ÷ '+qty+' = '+nice(unit));
-  if(cycle===2)moreNumber('purchase','multi',
-    scene+'準備 '+qty+' 份禮物，每份 '+nice(price)+' 元，另外要支付運送費 '+nice(5+n*.5)+' 元。請問總支出是多少元？',
-    round2(total+5+n*.5),nice(price)+' × '+qty+' + '+nice(5+n*.5)+' = '+nice(round2(total+5+n*.5)));
-  if(cycle===3)moreNumber('purchase','multiply',
-    scene+'需要 '+nice(round2(.5+qty*.25))+' 公斤果乾，每公斤售價 '+nice(36+n*1.5)+' 元，依重量計價。請問需要付多少元？',
-    round2((.5+qty*.25)*(36+n*1.5)),nice(round2(.5+qty*.25))+' × '+nice(36+n*1.5)+' = '+nice(round2((.5+qty*.25)*(36+n*1.5))));
-  if(cycle===4)moreNumber('purchase','addsub',
-    scene+'帶了 '+nice(total+60)+' 元，花掉 '+nice(total)+' 元購買學用品，沒有其他支出。請問剩下多少元？',
-    60,nice(total+60)+' − '+nice(total)+' = 60');
-  // 小數計算：加減乘除和先乘後加
-  const a=round2(2.4+n*.35),b=round2(.6+(i%4)*.25);
-  if(cycle===0)moreNumber('calc','addsub',scene+'在秤重時記下 '+nice(a)+' 公斤與 '+nice(b)+' 公斤兩筆重量。把它們相加後，總重量是多少公斤？',
-    round2(a+b),nice(a)+' + '+nice(b)+' = '+nice(round2(a+b)),' 公斤');
-  if(cycle===1)moreNumber('calc','addsub',scene+'有 '+nice(a+3)+' 公升的飲料，已經倒出 '+nice(a)+' 公升。請用小數減法計算還剩多少公升？',
-    3,nice(a+3)+' − '+nice(a)+' = 3',' 公升');
-  if(cycle===2)moreNumber('calc','multiply',scene+'每包點心重 '+nice(b)+' 公斤，連續拿取 '+qty+' 包相同點心。請用小數乘法算出總共幾公斤？',
-    round2(b*qty),nice(b)+' × '+qty+' = '+nice(round2(b*qty)),' 公斤');
-  if(cycle===3)moreNumber('calc','divide',scene+'要把 '+nice(round2(a*qty))+' 公升果汁平分成 '+qty+' 瓶，每瓶裝相同容量。每瓶應裝多少公升？',
-    a,nice(round2(a*qty))+' ÷ '+qty+' = '+nice(a),' 公升');
-  if(cycle===4)moreNumber('calc','multi',scene+'有 '+qty+' 盒餅乾，每盒 '+nice(b)+' 公斤，另外再拿 '+nice(a)+' 公斤。請先計算盒裝重量再加上散裝重量，總共是多少公斤？',
-    round2(qty*b+a),qty+' × '+nice(b)+' + '+nice(a)+' = '+nice(round2(qty*b+a)),' 公斤');
-  // 折扣：售價、節省金額、兩件促銷、折後再減
-  const original=100+20*n,rate=[.8,.9,.75,.85,.6][cycle],sale=round2(original*rate);
-  if(cycle===0||cycle===2)moreNumber('discount','discount',scene+'的商品原價 '+original+' 元，現在打 '+nice(rate*10)+' 折，意思是只付原價的 '+nice(rate*100)+'%。請問實際應付多少元？',
-    sale,original+' × '+nice(rate)+' = '+nice(sale));
-  if(cycle===1)moreNumber('discount','discount',scene+'的商品原價 '+original+' 元，打 '+nice(rate*10)+' 折。題目問的是比原價省下的金額，而不是售價。請問省下多少元？',
-    round2(original-sale),original+' − '+nice(sale)+' = '+nice(round2(original-sale)));
-  if(cycle===3)moreNumber('discount','multi',scene+'購物時商品原價 '+original+' 元，先打 '+nice(rate*10)+' 折，再使用 '+(5+n)+' 元折價券。請問最終需付多少元？',
-    round2(sale-(5+n)),original+' × '+nice(rate)+' − '+(5+n)+' = '+nice(round2(sale-(5+n))));
-  if(cycle===4)moreNumber('discount','discount',scene+'同款商品每件原價 '+original+' 元，買兩件時第二件打 '+nice(rate*10)+' 折，第一件仍付原價。請問兩件共付多少元？',
-    original+sale,original+' + '+original+' × '+nice(rate)+' = '+nice(original+sale));
-  // 比價：同樣份量下的單價比較
-  const ua=round2(18+(n%8)*1.25),ub=round2(ua+(i%2===0?2:-2));
-  const qa=2+(i%3),qb=3+(i%4);
-  moreCompare(scene+'購買相同品質的同款餅乾，甲店 '+qa+' 包共 '+nice(ua*qa)+' 元；乙店 '+qb+' 包共 '+nice(ub*qb)+' 元。換算每包單價後，哪一家比較便宜？',ua,ub,round2(ua*qa),round2(ub*qb));
-  // 商人陷阱：找出被誤導的價格，依折數、加總、平均單價
-  const claimed=round2(total+8+n*.5);
-  if(cycle===0||cycle===3)moreNumber('scam','multiply',scene+'商人說每份 '+nice(price)+' 元、共 '+qty+' 份，應付 '+nice(claimed)+' 元。請檢查乘法算式，正確應付金額是多少元？',
-    total,nice(price)+' × '+qty+' = '+nice(total)+'（不是 '+nice(claimed)+'）');
-  if(cycle===1||cycle===4)moreNumber('scam','discount',scene+'商品原價 '+original+' 元，打 '+nice(rate*10)+' 折後商人仍要收 '+nice(sale+15)+' 元。請問真正的折後售價應是多少元？',
-    sale,original+' × '+nice(rate)+' = '+nice(sale));
-  if(cycle===2)moreNumber('scam','unit',scene+'同款用品 '+qty+' 件共 '+nice(round2(unit*qty))+' 元，商人說每件 '+nice(unit+3)+' 元。請用除法重新核對，每件正確單價是多少元？',
-    unit,nice(round2(unit*qty))+' ÷ '+qty+' = '+nice(unit));
-  // 寶箱：小數密碼（無貨幣單位）
-  const base=round2(1.25+n*.15),mult=2+(i%5),secret=round2(base*mult);
-  if(cycle===0||cycle===3)moreNumber('chest','multiply','神祕寶箱的密碼是一道小數乘法：'+nice(base)+' × '+mult+'。請計算正確答案才能解鎖，密碼應是多少？',
-    secret,nice(base)+' × '+mult+' = '+nice(secret),'');
-  if(cycle===1)moreNumber('chest','divide','尋寶隊發現一串密碼 '+nice(secret)+' ÷ '+mult+'，要把小數平均分成相同份數。請問解鎖數值是多少？',
-    base,nice(secret)+' ÷ '+mult+' = '+nice(base),'');
-  if(cycle===2)moreNumber('chest','addsub','藏寶圖要求把 '+nice(base)+' 和 '+nice(secret)+' 兩個小數相加，算出下一道密碼。請問正確結果是多少？',
-    round2(base+secret),nice(base)+' + '+nice(secret)+' = '+nice(round2(base+secret)),'');
-  if(cycle===4)moreNumber('chest','addsub','森林寶箱要計算 '+nice(secret+base)+' 減去 '+nice(base)+' 的差，作為鎖頭密碼。請問應輸入多少？',
-    secret,nice(secret+base)+' − '+nice(base)+' = '+nice(secret),'');
-  // 機會：生活中意外出現的折價券、購物、找零
-  if(cycle===0||cycle===3)moreNumber('chance','addsub',scene+'幸運抽到購物券，付給店家 '+nice(total+80)+' 元，商品總價 '+nice(total)+' 元。請問店家應找回多少元？',
-    80,nice(total+80)+' − '+nice(total)+' = 80');
-  if(cycle===1)moreNumber('chance','multiply',scene+'意外得到團購機會，每盒餅乾 '+nice(price)+' 元，買 '+qty+' 盒沒有額外費用。總共應付多少元？',
-    total,nice(price)+' × '+qty+' = '+nice(total));
-  if(cycle===2)moreNumber('chance','unit',scene+'商店有 '+qty+' 張票共賣 '+nice(round2(unit*qty))+' 元，假設同票同價。請問每張平均多少元？',
-    unit,nice(round2(unit*qty))+' ÷ '+qty+' = '+nice(unit));
-  if(cycle===4)moreNumber('chance','discount',scene+'撿到優惠券！原價 '+original+' 元的物品打 '+nice(rate*10)+' 折，也就是付原價的 '+nice(rate*100)+'%。請問售價多少元？',
-    sale,original+' × '+nice(rate)+' = '+nice(sale));
-  // 命運：天氣、交通及突發事件
-  if(cycle===0||cycle===4)moreNumber('fate','multiply',scene+'突然下雨要買雨衣，每件 '+nice(price)+' 元，需要 '+qty+' 件，沒有折扣。請問總支出是多少元？',
-    total,nice(price)+' × '+qty+' = '+nice(total));
-  if(cycle===1)moreNumber('fate','addsub',scene+'交通卡原有 '+nice(total+50)+' 元，因臨時改道花掉 '+nice(total)+' 元。請問卡片餘額還有多少元？',
-    50,nice(total+50)+' − '+nice(total)+' = 50');
-  if(cycle===2)moreNumber('fate','multi',scene+'學校臨時增加 '+qty+' 位參加者，每人餐費 '+nice(price)+' 元，再支付服務費 '+(8+n)+' 元。請問總共需要多少元？',
-    round2(total+8+n),nice(price)+' × '+qty+' + '+(8+n)+' = '+nice(round2(total+8+n)));
-  if(cycle===3)moreNumber('fate','divide',scene+'補給隊臨時需要 '+qty+' 瓶水，總共 '+nice(round2(unit*qty))+' 公升，假設每瓶一樣多。請問每瓶水是多少公升？',
-    unit,nice(round2(unit*qty))+' ÷ '+qty+' = '+nice(unit),' 公升');
-  // Boss：乘加減與折扣的兩步驟
-  if(cycle===0||cycle===3)moreNumber('boss','multi','Boss 綜合題：'+scene+'要買 '+qty+' 份材料，每份 '+nice(price)+' 元，另外加運費 '+(11+n)+' 元。請問總付款金額是多少元？',
-    round2(total+11+n),nice(price)+' × '+qty+' + '+(11+n)+' = '+nice(round2(total+11+n)));
-  if(cycle===1)moreNumber('boss','multi','Boss 綜合題：'+scene+'的商品原價 '+original+' 元，先打 '+nice(rate*10)+' 折，再扣 '+(7+n)+' 元優惠金。請問最後要付多少元？',
-    round2(sale-(7+n)),original+' × '+nice(rate)+' − '+(7+n)+' = '+nice(round2(sale-(7+n))));
-  if(cycle===2)moreNumber('boss','multi','Boss 綜合題：'+scene+'拿 '+nice(total+120)+' 元買 '+qty+' 件商品，每件 '+nice(price)+' 元。請先算總價再求找零，最後剩多少元？',
-    120,nice(total+120)+' − '+nice(price)+' × '+qty+' = 120');
-  if(cycle===4)moreNumber('boss','multi','Boss 綜合題：'+scene+'買 '+qty+' 件商品，每件 '+nice(price)+' 元，再用 '+(8+n)+' 元折價券。請問實際應付多少元？',
-    round2(total-(8+n)),nice(price)+' × '+qty+' − '+(8+n)+' = '+nice(round2(total-(8+n))));
-  // 救援：補足缺額、付款找零、平均單價
-  if(cycle===0||cycle===4)moreNumber('rescue','addsub',scene+'需要緊急補助 '+nice(total+50)+' 元，目前只剩 '+nice(total)+' 元，請先算出還缺多少元才能完成付款？',
-    50,nice(total+50)+' − '+nice(total)+' = 50');
-  if(cycle===1)moreNumber('rescue','unit',scene+'需要分攤費用，總共 '+nice(round2(unit*qty))+' 元由 '+qty+' 人平均支付。每人應付多少元？',
-    unit,nice(round2(unit*qty))+' ÷ '+qty+' = '+nice(unit));
-  if(cycle===2)moreNumber('rescue','multiply',scene+'緊急採購 '+qty+' 件用品，每件 '+nice(price)+' 元，沒有折扣。請計算總共需要多少元才能完成救援？',
-    total,nice(price)+' × '+qty+' = '+nice(total));
-  if(cycle===3)moreNumber('rescue','discount',scene+'緊急救援時，必需品原價 '+original+' 元，打 '+nice(rate*10)+' 折可以省一些錢。請問折扣後的實際付款是多少元？',
-    sale,original+' × '+nice(rate)+' = '+nice(sale));
+function pair(r1,r2,unit){
+  return {shape:'pair',first:r1,second:r2,label:'radius',unit};
 }
-
-const TOTAL = Object.values(BANK).reduce((sum, list) => sum + list.length, 0);
-module.exports = { BANK, TOTAL, SKILLS };
+function create(kind,index){
+  const category=KINDS.indexOf(kind);
+  const scene=SCENES[(index*3+category*5)%SCENES.length];
+  const radius=3+((index*7+category*3)%19);
+  const radius2=radius+2+index%4;
+  const unit=index%3===0?'公尺':'公分';
+  const areaUnit=unit==='公尺'?'平方公尺':'平方公分';
+  const mode=(index+category*3)%13;
+  const c=circumference(radius),a=area(radius),d=radius*2;
+  const prefix=kind==='boss'?'Boss 幾何挑戰：':kind==='chest'?'圓形寶箱密碼：':kind==='rescue'?'緊急幾何救援：':'';
+  if(mode===0){
+    numberQuestion(kind,prefix+scene+'的半徑為 '+radius+unit+'，請計算沿著圓形邊緣一圈的圓周長是多少？',
+      c,unit,show(radius)+' × 2 × 3.14 = '+show(c)+'（'+unit+'）','circumference',circle('radius',radius,unit));
+  }else if(mode===1){
+    numberQuestion(kind,prefix+scene+'的直徑為 '+d+unit+'，如果沿著完整圓周走一圈，長度是多少？',
+      c,unit,show(d)+' × 3.14 = '+show(c)+'（'+unit+'）','circumference',circle('diameter',d,unit));
+  }else if(mode===2){
+    numberQuestion(kind,prefix+scene+'的半徑為 '+radius+unit+'，需要鋪滿整個圓形表面，面積是多少？',
+      a,areaUnit,show(radius)+' × '+show(radius)+' × 3.14 = '+show(a)+'（'+areaUnit+'）','area',circle('radius',radius,unit));
+  }else if(mode===3){
+    numberQuestion(kind,prefix+scene+'的直徑為 '+d+unit+'，先求出半徑，再計算整個圓形的面積是多少？',
+      a,areaUnit,show(d)+' ÷ 2 = '+show(radius)+'（'+unit+'）；'+show(radius)+' × '+show(radius)+' × 3.14 = '+show(a)+'（'+areaUnit+'）','area',circle('diameter',d,unit));
+  }else if(mode===4){
+    numberQuestion(kind,prefix+scene+'量得整圈圓周長為 '+show(c)+unit+'，求出這個圓的半徑是多少？',
+      radius,unit,show(c)+' ÷ 3.14 = '+show(d)+'（'+unit+'，直徑）；'+show(d)+' ÷ 2 = '+show(radius)+'（'+unit+'，半徑）','inverse',circle('circumference',c,unit));
+  }else if(mode===5){
+    numberQuestion(kind,prefix+scene+'的圓周長為 '+show(c)+unit+'，若要測量圓形最寬的直線距離，直徑是多少？',
+      d,unit,show(c)+' ÷ 3.14 = '+show(d)+'（'+unit+'）','inverse',circle('circumference',c,unit));
+  }else if(mode===6){
+    numberQuestion(kind,prefix+scene+'的半徑為 '+radius+unit+'，若把半徑增加到原來的兩倍，新的圓周長是多少？',
+      circumference(radius*2),unit,'新半徑＝'+radius+' × 2 = '+(radius*2)+'；新圓周長＝'+(radius*2)+' × 2 × 3.14 = '+show(circumference(radius*2))+'（'+unit+'）','compare',pair(radius,radius*2,unit));
+  }else if(mode===7){
+    numberQuestion(kind,prefix+scene+'的半徑為 '+radius+unit+'，若改成半徑是原來兩倍的圓形，新面積是多少？',
+      area(radius*2),areaUnit,'新半徑＝'+radius+' × 2 = '+(radius*2)+'；新面積＝'+(radius*2)+' × '+(radius*2)+' × 3.14 = '+show(area(radius*2))+'（'+areaUnit+'）','compare',pair(radius,radius*2,unit));
+  }else if(mode===8){
+    const r=2*Math.ceil(radius/2);
+    numberQuestion(kind,prefix+scene+'改成半圓形，原本整個圓的半徑是 '+r+unit+'。只求半圓的面積，應是多少？',
+      round2(area(r)/2),areaUnit,'整圓面積＝'+r+' × '+r+' × 3.14 = '+show(area(r))+'；半圓面積＝'+show(area(r))+' ÷ 2 = '+show(area(r)/2)+'（'+areaUnit+'）','combined',{shape:'semicircle',label:'radius',value:r,unit});
+  }else if(mode===9){
+    numberQuestion(kind,prefix+scene+'做成半圓形，原本整圓半徑為 '+radius+unit+'。含下方直徑的完整半圓周界是多少？',
+      round2(PI*radius+2*radius),unit,'弧長＝3.14 × '+radius+' = '+show(PI*radius)+'；再加直徑 '+d+'；周界＝'+show(PI*radius+2*radius)+'（'+unit+'）','combined',{shape:'semicircle',label:'radius',value:radius,unit});
+  }else if(mode===10){
+    const outer=radius+3,inner=radius;
+    numberQuestion(kind,prefix+scene+'有一個圓環形區域，外圓半徑 '+outer+unit+'，內圓半徑 '+inner+unit+'。圓環面積是多少？',
+      round2(area(outer)-area(inner)),areaUnit,'外圓面積＝'+outer+' × '+outer+' × 3.14 = '+show(area(outer))+'；內圓面積＝'+inner+' × '+inner+' × 3.14 = '+show(area(inner))+'；相減＝'+show(area(outer)-area(inner))+'（'+areaUnit+'）','combined',{shape:'ring',outer,inner,unit});
+  }else if(mode===11){
+    numberQuestion(kind,prefix+scene+'有一個邊長 '+d+unit+' 的正方形，裡面正好畫一個內切圓，圓的半徑 '+radius+unit+'。正方形扣掉圓的面積是多少？',
+      round2(d*d-a),areaUnit,'正方形面積＝'+d+' × '+d+' = '+(d*d)+'；圓面積＝'+radius+' × '+radius+' × 3.14 = '+show(a)+'；相減＝'+show(d*d-a)+'（'+areaUnit+'）','combined',{shape:'square-circle',label:'radius',value:radius,unit});
+  }else{
+    choiceQuestion(kind,prefix+scene+'有甲、乙兩個完整圓，甲圓半徑 '+radius+unit+'，乙圓半徑 '+radius2+unit+'。如果比較兩圓的面積，哪一個比較大？',
+      '乙圓','甲圓','甲圓面積＝'+show(area(radius))+'（'+areaUnit+'）；乙圓面積＝'+show(area(radius2))+'（'+areaUnit+'）。因為 '+show(area(radius2))+' > '+show(area(radius))+'，乙圓較大。','compare',pair(radius,radius2,unit));
+  }
+}
+for(const kind of KINDS)for(let i=0;i<40;i++)create(kind,i);
+const TOTAL=Object.values(BANK).reduce((sum,items)=>sum+items.length,0);
+if(TOTAL!==400)throw new Error('題庫數量不符：'+TOTAL);
+module.exports={BANK,TOTAL,SKILLS,PI};

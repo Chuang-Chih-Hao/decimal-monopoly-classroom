@@ -18,42 +18,42 @@ const STORY_SECONDS = 25;
 const BOT_ACCURACY = 0.65; // 機器人不保證每題答對
 const BOT_STEP_DELAY_MS = 1200; // 定期 tick 觸發，保留演出節奏
 const ACHIEVEMENTS = Object.freeze([
-  {id:'first_answer',icon:'🌟',title:'小數新星',description:'正式答對第 1 道數學題'},
+  {id:'first_answer',icon:'🌟',title:'圓形新星',description:'正式答對第 1 道數學題'},
   {id:'three_correct',icon:'🧮',title:'計算達人',description:'正式累積答對 3 道數學題'},
-  {id:'discount_master',icon:'🏷️',title:'折扣高手',description:'正式答對 2 題折扣類題目'},
-  {id:'unit_detective',icon:'🔎',title:'比價偵探',description:'正式答對 2 題單價比價類題目'},
+  {id:'circumference_master',icon:'📏',title:'周長高手',description:'正式答對 2 題圓周長計算'},
+  {id:'area_master',icon:'🔵',title:'面積達人',description:'正式答對 2 題圓面積計算'},
   {id:'first_property',icon:'🏠',title:'店面新星',description:'成功購買第一間店面'},
   {id:'three_properties',icon:'🏘️',title:'島嶼經營家',description:'累積擁有 3 間店面'},
   {id:'spectator_star',icon:'👀',title:'觀戰智多星',description:'觀戰猜題累積猜對 3 題'},
   {id:'story_brave',icon:'🔮',title:'命運冒險家',description:'在命運或機會事件選過冒險方案'}
 ]);
 const STORY_DESCRIPTIONS = Object.freeze({
-  '校園園遊會':'熱鬧的園遊會開始了，攤主邀請你挑戰神祕紅包。你想穩穩解題，還是冒險爭取更大的獎勵？',
-  '買一送一好運':'商店正舉辦限時活動，工作人員拿出兩個不同風險的優惠信封。',
-  '幸運發票':'你撿到一張可以兌換獎勵的發票，卻不確定裡面的幸運金額。',
-  '好心有好報':'你在島上幫忙整理物資，村長問你要選固定感謝禮，還是神祕加碼。',
-  '交通卡儲值禮':'車站出現兩台儲值機，一台獎勵穩定，另一台可能送出更大驚喜。',
-  '雨天小插曲':'突如其來的暴雨弄濕了冒險裝備，你可以簡單修補或挑戰高回報的修復任務。',
-  '抽中小禮物':'命運轉盤送來一份包裹，你可以安全領取，或打開帶有未知費用的特別禮物。',
-  '水壺不見了':'探險途中水壺不見了！選擇穩健地尋找，或接受神祕人的高風險尋物挑戰。',
-  '友情應援金':'朋友願意支援你的冒險，但你得決定領取基本物資或試試加倍挑戰。',
-  '巴士誤點':'巴士因天候延誤，站務員提供兩種不同風險的補償計畫。'
+  '圓形花圃測量':'園丁要在圓形花圃外圍裝欄杆，你會挑戰穩健的測量任務，還是選高獎金冒險？',
+  '圓形舞台設計':'園遊會要鋪設圓形舞台，你要先估算材料，還是挑戰更大的工程？',
+  '飛盤大賽':'運動用品店舉辦飛盤挑戰，必須用圓周長公式計算周界。',
+  '圓桌佈置':'咖啡館要替圓桌鋪桌布。兩個方案的獎勵不同，選擇後完成面積題。',
+  '摩天輪維修':'摩天輪的圓形外框需要保養，你要選較穩定的維修方案，還是挑戰大工程？',
+  '圓形池塘修護':'雨後圓形池塘需要維修，請先測量半徑與圓周。',
+  '月亮形裝飾':'神祕禮物是一個半圓裝飾，選擇路線後算出需要的材料。',
+  '迷路的指南針':'指南針畫著一個圓。你可選擇按圖計算，或冒險解鎖另一個謎題。',
+  '同心圓尋寶':'地圖上畫著兩個同心圓，選擇探索方式後挑戰圓形面積題。',
+  '圓形跑道挑戰':'冒險隊發現一條圓形跑道，正確計算一圈長度才能取得獎勵。'
 });
 const ROOM_TTL_MS = 8 * 60 * 60 * 1000;
 const EVENT_CARDS = {
   chance: [
-    {title:'校園園遊會',detail:'答對領取園遊會紅包 $60！',success:60,fail:0},
-    {title:'買一送一好運',detail:'答對拿到購物禮金 $75！',success:75,fail:-20},
-    {title:'幸運發票',detail:'答對獲得獎金 $50！',success:50,fail:0},
-    {title:'好心有好報',detail:'答對獲得愛心獎學金 $70！',success:70,fail:-30},
-    {title:'交通卡儲值禮',detail:'答對可獲得 $45 儲值金！',success:45,fail:0}
+    {title:'圓形花圃測量',detail:'答對周長題獲得 $60 維修獎勵！',success:60,fail:0},
+    {title:'圓形舞台設計',detail:'答對面積題可獲得 $75 材料獎金！',success:75,fail:-20},
+    {title:'飛盤大賽',detail:'答對圓形測量題可獲得 $50！',success:50,fail:0},
+    {title:'圓桌佈置',detail:'答對圓面積題獲得 $70！',success:70,fail:-30},
+    {title:'摩天輪維修',detail:'答對公式應用題可獲得 $45！',success:45,fail:0}
   ],
   fate: [
-    {title:'雨天小插曲',detail:'答對可免去修理費並獲得 $30 補助；答錯損失 $80。',success:30,fail:-80},
-    {title:'抽中小禮物',detail:'答對可獲得 $55；答錯支付 $40 運費。',success:55,fail:-40},
-    {title:'水壺不見了',detail:'答對只需支付 $20 補買費；答錯要支付 $90。',success:-20,fail:-90},
-    {title:'友情應援金',detail:'答對獲得 $50；答錯則原地不動、資產不變。',success:50,fail:0},
-    {title:'巴士誤點',detail:'答對獲得 $35 補償金；答錯需支付 $50 車資。',success:35,fail:-50}
+    {title:'圓形池塘修護',detail:'答對得 $30 維修補助，未答對損失 $80。',success:30,fail:-80},
+    {title:'月亮形裝飾',detail:'答對半圓題獲得 $55；未答對支付 $40。',success:55,fail:-40},
+    {title:'迷路的指南針',detail:'答對只需付 $20 搜尋費，未答對需付 $90。',success:-20,fail:-90},
+    {title:'同心圓尋寶',detail:'答對獲得 $50；未答對金額不變。',success:50,fail:0},
+    {title:'圓形跑道挑戰',detail:'答對周長題得 $35，未答對付 $50 裝備費。',success:35,fail:-50}
   ]
 };
 const shuffle = (array) => {
@@ -164,8 +164,8 @@ class GameManager {
     const animal=ANIMALS.find(a=>!room.players.some(p=>p.animal===a));
     if(!animal)throw new GameError('目前沒有可用的動物棋子。');
     let index=1;
-    while(room.players.some(p=>p.name===`小數機器人${index}`))index++;
-    const bot=this.makePlayer(`小數機器人${index}`,animal,false,true);
+    while(room.players.some(p=>p.name===`圓形機器人${index}`))index++;
+    const bot=this.makePlayer(`圓形機器人${index}`,animal,false,true);
     room.players.push(bot);
     message(room,`🤖 房主新增了 ${bot.name}，由伺服器自動擲骰與解題。`);
     return bot;
@@ -317,8 +317,8 @@ class GameManager {
     if(player.correct>=1)this.unlockAchievement(room,player,'first_answer');
     if(player.correct>=3)this.unlockAchievement(room,player,'three_correct');
     const countSkill=skill=>player.answerHistory.filter(x=>x.result==='correct'&&x.skill===skill).length;
-    if(countSkill('discount')>=2)this.unlockAchievement(room,player,'discount_master');
-    if(countSkill('unit')>=2)this.unlockAchievement(room,player,'unit_detective');
+    if(countSkill('circumference')>=2)this.unlockAchievement(room,player,'circumference_master');
+    if(countSkill('area')>=2)this.unlockAchievement(room,player,'area_master');
     if(player.properties.length>=1)this.unlockAchievement(room,player,'first_property');
     if(player.properties.length>=3)this.unlockAchievement(room,player,'three_properties');
     if(player.spectatorCorrect>=3)this.unlockAchievement(room,player,'spectator_star');
@@ -396,7 +396,7 @@ class GameManager {
     const answers=shuffle([chosen.answer,...chosen.distractors]);
     return { id, kind, text:chosen.question, options:answers,
       correctIndex:answers.indexOf(chosen.answer), explanation:chosen.explanation,
-      correctText:chosen.answer };
+      correctText:chosen.answer,diagram:chosen.diagram };
   }
 
   ask(room,kind,context={},opts={}) {
@@ -410,7 +410,7 @@ class GameManager {
     room.poll={id:randomUUID(),questionId:question.id,actorId:room.currentPlayerId,choices:{}};
     room.lastPoll=null;
     room.phase='answering';
-    message(room, `📖 ${room.players.find(p=>p.id===room.currentPlayerId)?.name} 遇到「${opts.label || BOARD[room.players.find(p=>p.id===room.currentPlayerId).position].name}」：請回答小數題！`);
+    message(room, `📖 ${room.players.find(p=>p.id===room.currentPlayerId)?.name} 遇到「${opts.label || BOARD[room.players.find(p=>p.id===room.currentPlayerId).position].name}」：請回答圓周長與圓面積題！`);
   }
 
   roll(room,playerId,forced=false) {
@@ -526,7 +526,7 @@ class GameManager {
     const result={
       correct,correctAnswer:q.correctText,explanation:q.explanation,at:Date.now(),
       // 正解與作答選項僅在題目結束後公布，便於直接對照題幹與解析。
-      questionText:q.text,questionOptions:[...q.options],correctIndex:q.correctIndex,
+      questionText:q.text,questionOptions:[...q.options],questionDiagram:q.diagram,correctIndex:q.correctIndex,
       selectedIndex:reason==='answer'?selectedIndex:null
     };
     room.lastResult=result;
@@ -853,7 +853,7 @@ class GameManager {
            card:room.pending.context?.card
              ? {title:room.pending.context.card.title,detail:room.pending.context.card.detail} : null,
            question:{id:room.pending.question.id,text:room.pending.question.text,
-             options:room.pending.question.options},expiresAt:room.pending.expiresAt}),
+             options:room.pending.question.options,diagram:room.pending.question.diagram},expiresAt:room.pending.expiresAt}),
       log:room.log,rankings:room.rankings,
       classFeedback:finished?summarizeClass(room.players.filter(p=>!p.isBot)):null,
       personalFeedback:viewer?summarizePlayer(viewer.answerHistory):null,

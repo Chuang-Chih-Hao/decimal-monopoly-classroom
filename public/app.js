@@ -1,7 +1,7 @@
 /* 小數富翁前端：所有資產、擲骰、判分都以伺服器狀態為準。 */
 (() => {
   'use strict';
-  const CLIENT_VERSION='1.9.0';
+  const CLIENT_VERSION='2.0.0';
   const socket=io({transports:['websocket','polling'],reconnection:true});
   const sound=window.DecimalMonopolyAudio;
   const playSound=(kind,detail)=>sound?.play(kind,detail);
@@ -55,7 +55,7 @@
   if(!layout||!playerColors)throw new Error('棋盤版型與動物配色未載入');
   const colorFor=p=>playerColors.forAnimal(p?.animal);
   const colorStyle=p=>`--player-color:${colorFor(p).hex};--player-light:${colorFor(p).light}`;
-  const typeNames={purchase:'購地數學考驗',calc:'小數神算',discount:'折扣挑戰',compare:'比價擂台',scam:'破解黑心商人',chest:'寶箱密碼',chance:'機會卡',fate:'命運卡',boss:'終極 Boss',rescue:'緊急救援'};
+  const typeNames={purchase:'圓形購地考驗',calc:'圓周長挑戰',discount:'圓面積研究所',compare:'雙圓比較',scam:'公式陷阱',chest:'圓形寶箱密碼',chance:'圓形機會卡',fate:'幾何命運卡',boss:'圓形終極 Boss',rescue:'幾何救援'};
   let selectedAnimal='capybara';
   let mapZoom=1;
   let mapZoomInitialized=false;
@@ -354,11 +354,11 @@
       31:{theme:'share',badge:'均付分享站',className:'fx-lucky',ambient:'<span class="ambient-piece">🤝</span>'},
       29:{theme:'wheel',badge:'命運大轉盤',className:'fx-wheel',ambient:'<span class="ambient-piece piece-wheel">🎡</span><span class="ambient-piece piece-spark">✦</span>'},
       0:{theme:'start',badge:'夢想起點',className:'fx-start',ambient:'<span class="ambient-piece piece-flag">🏁</span><span class="ambient-piece piece-spark">✦</span>'},
-      10:{theme:'rescue',badge:'黑心商人',className:'fx-alert',ambient:'<span class="ambient-piece piece-alert">❗</span><span class="ambient-piece piece-star">✦</span>'},
+      10:{theme:'rescue',badge:'公式陷阱站',className:'fx-alert',ambient:'<span class="ambient-piece piece-alert">❗</span><span class="ambient-piece piece-star">✦</span>'},
       14:{theme:'chest',badge:'神祕寶箱',className:'fx-chest',ambient:'<span class="ambient-piece piece-key">🎁</span><span class="ambient-piece piece-star">✦</span>'},
       18:{theme:'tax',badge:'稅務提醒',className:'fx-alert',ambient:'<span class="ambient-piece piece-tax">🧾</span><span class="ambient-piece piece-star">✦</span>'},
       21:{theme:'boss',badge:'終極 Boss',className:'fx-boss',ambient:'<span class="ambient-piece piece-boss">⚡</span><span class="ambient-piece piece-star">✦</span>'},
-      25:{theme:'compare',badge:'精打細算站',className:'fx-compare',ambient:'<span class="ambient-piece piece-bag">🛒</span><span class="ambient-piece piece-spark">✦</span>'}
+      25:{theme:'compare',badge:'半徑觀察站',className:'fx-compare',ambient:'<span class="ambient-piece piece-bag">🛒</span><span class="ambient-piece piece-spark">✦</span>'}
     };
     const typeDefaults={
       property:{theme:'property',badge:'店面抵達',className:'fx-shop',ambient:'<span class="ambient-piece piece-star">✦</span>'},
@@ -366,10 +366,10 @@
       fate:{theme:'fate',badge:'命運啟動',className:'fx-spin',ambient:'<span class="ambient-piece piece-orb">🔮</span>'},
       chest:{theme:'chest',badge:'寶箱開啟',className:'fx-chest',ambient:'<span class="ambient-piece piece-key">🗝️</span>'},
       boss:{theme:'boss',badge:'Boss 警報',className:'fx-boss',ambient:'<span class="ambient-piece piece-boss">⚡</span>'},
-      discount:{theme:'discount',badge:'折扣挑戰',className:'fx-tag',ambient:'<span class="ambient-piece piece-star">🏷️</span>'},
-      compare:{theme:'compare',badge:'比價開始',className:'fx-compare',ambient:'<span class="ambient-piece piece-star">⚖️</span>'},
-      calc:{theme:'calc',badge:'小數神算',className:'fx-calc',ambient:'<span class="ambient-piece piece-star">🧮</span>'},
-      scam:{theme:'scam',badge:'黑心商人',className:'fx-alert',ambient:'<span class="ambient-piece piece-alert">❗</span>'},
+      discount:{theme:'discount',badge:'圓面積挑戰',className:'fx-tag',ambient:'<span class="ambient-piece piece-star">🔵</span>'},
+      compare:{theme:'compare',badge:'兩圓比較',className:'fx-compare',ambient:'<span class="ambient-piece piece-star">⭕</span>'},
+      calc:{theme:'calc',badge:'圓周長計算',className:'fx-calc',ambient:'<span class="ambient-piece piece-star">📏</span>'},
+      scam:{theme:'scam',badge:'公式陷阱',className:'fx-alert',ambient:'<span class="ambient-piece piece-alert">❗</span>'},
       start:{theme:'start',badge:'抵達起點',className:'fx-start',ambient:'<span class="ambient-piece piece-flag">🏁</span>'},
       rest:{theme:'rest',badge:'補給休息',className:'fx-rest',ambient:'<span class="ambient-piece piece-bag">🛍️</span>'},
       tax:{theme:'tax',badge:'稅務提醒',className:'fx-alert',ambient:'<span class="ambient-piece piece-tax">🧾</span>'}
@@ -693,7 +693,7 @@
       const pawns=state.players.filter(p=>p.position===tile.id&&p.id!==activeRollAnimation?.playerId);
       const currentPos=activeRollAnimation ? activeRollAnimation.from : activePlayer()?.position;
       const flavor=tileFlavorSpec(tile);
-      el.className=`tile ${tile.type}${tile.group?' group-'+tile.group:''} tile-theme-${flavor.theme||'event'}${pawns.length?' active-tile':''}${owner?' owned':''}${currentPos===tile.id?' current-turn-tile':''}${[0,10,16,26].includes(tile.id)?' board-corner':''}`;
+      el.className=`tile ${tile.type}${['discount','compare','calc','scam','boss'].includes(tile.type)?' geometry-learning-tile':''}${tile.group?' group-'+tile.group:''} tile-theme-${flavor.theme||'event'}${pawns.length?' active-tile':''}${owner?' owned':''}${currentPos===tile.id?' current-turn-tile':''}${[0,10,16,26].includes(tile.id)?' board-corner':''}`;
       el.dataset.tileId=String(tile.id);
       el.dataset.tileTheme=flavor.theme||'event';
       el.style.left=`${(col+.5)*layout.CELL}px`;
@@ -702,6 +702,7 @@
       el.title=tile.type==='property'?`${tile.name}：購地 ${money(tile.price)}，租金 ${money(tile.rent)}${owner?'，屋主 '+owner.name+'（'+colorFor(owner).name+'）':''}`:`${tile.name}：${tile.tip||''}`;
       el.innerHTML=`<div class="tile-ambient ambient-${flavor.theme||'event'}" aria-hidden="true">${flavor.ambient||''}</div><span class="tile-number">${String(tile.id).padStart(2,'0')}</span><span class="tile-icon">${esc(tile.icon)}</span><span class="tile-name">${esc(tile.name)}</span>`
         +(tile.price?`<span class="tile-price">${money(tile.price)}</span>`:'')
+        +(['discount','compare','calc','scam','boss'].includes(tile.type)?'<span class="tile-geometry-mark" aria-hidden="true">◉</span>':'')
         +(owner?`<span class="owner-mini" title="${esc(owner.name)} 的房產">${animalHtml(owner.animal)}<span>${esc(owner.name)}</span></span>`:'')
         +`<div class="tile-pawns">${pawns.map(p=>`<span class="pawn${p.id===state.currentPlayerId?' pawn-current':''}" style="${colorStyle(p)}" title="${esc(p.name)}・${colorFor(p).name}">${animalHtml(p.animal)}</span>`).join('')}</div>`;
       board.appendChild(el);
@@ -709,8 +710,8 @@
     const center=document.createElement('div');center.id='board-center';center.className='board-center';
     const last=state.lastRoll,who=last?state.players.find(p=>p.id===last.playerId):null;
     const current=activePlayer();
-    const description=last?`${esc(who?.name||'玩家')} 擲出 ${last.die} 點！` :'32 格經典方格棋盤';
-    center.innerHTML=`<div class="center-content"><div class="center-logo">🌴 💰 🎲</div><div class="center-title">小數富翁<br/>探險島</div><div class="center-desc">${description}<br/>買店面・算折扣・雙人對戰</div><div class="center-turn" style="${colorStyle(current)}">${animalHtml(current?.animal||'🐾')} 現在輪到 ${esc(current?.name||'冒險家')}</div>${last?`<span class="dice-face" aria-label="${last.die} 點">${diceIcons[last.die]}</span>`:''}</div>`;
+    const description=last?`${esc(who?.name||'玩家')} 擲出 ${last.die} 點！`  :'32 格經典方格棋盤';
+    center.innerHTML=`<div class="center-content"><div class="center-logo">🌴 💰 🎲</div><div class="center-title">小數富翁<br/>探險島</div><div class="center-desc">${description}<br/>買店面・算圓面積・雙人對戰</div><div class="center-turn" style="${colorStyle(current)}">${animalHtml(current?.animal||'🐾')} 現在輪到 ${esc(current?.name||'冒險家')}</div>${last?`<span class="dice-face" aria-label="${last.die} 點">${diceIcons[last.die]}</span>`:''}</div>`;
     board.appendChild(center);
     const focusKey=state.currentPlayerId;
     if(mapFocusKey!==focusKey){
@@ -897,7 +898,7 @@
     }else if(phase==='story'){
       el.innerHTML=`<div class="phase-help">${turn?'🔮 命運事件！請選擇一條冒險路線。':'🔮 '+esc(activePlayer()?.name)+' 正在決定命運分支！'}</div>`;
     }else if(phase==='answering'){
-      el.innerHTML=`<div class="phase-help">${turn?'📖 你遇到了數學挑戰！請看下方題目。':'📖 '+esc(activePlayer()?.name)+' 正在解小數題，大家可以一起算算看！'}</div>`;
+      el.innerHTML=`<div class="phase-help">${turn?'📖 你遇到了數學挑戰！請看下方題目。':'📖 '+esc(activePlayer()?.name)+' 正在挑戰圓周長與圓面積，大家可以一起計算！'}</div>`;
     }else if(phase==='buying'){
       el.innerHTML=`<div class="phase-help">${turn?'🏡 答對了！決定要不要購買這間店。':'🏡 等待 '+esc(activePlayer()?.name)+' 決定是否購地…'}</div>`;
     }else if(phase==='duel'){
@@ -944,6 +945,61 @@
     timer.textContent=`⏱️ ${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')} ${level===2?'🚀 最終衝刺 +$30':level===1?'✨ 中場加碼 +$15':`｜${state.durationMinutes} 分鐘挑戰`}`;
     timer.classList.toggle('ending',remaining<=180);
   }
+  // 以 SVG 繪製題目附圖：只顯示題幹已知數值，絕不在作答前偷顯示半徑推算答案。
+  function renderCircleDiagram(spec){
+    if(!spec||!['circle','semicircle','pair','ring','square-circle'].includes(spec.shape))return '';
+    const unit=esc(spec.unit||'公分');
+    const n=value=>String(Number(value));
+    const circleSvg=(cx,cy,r,fill='#bde7de')=>
+      '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="'+fill+'" stroke="#299982" stroke-width="3"/>';
+    const radiusLine=(cx,cy,r,label)=>
+      '<line x1="'+cx+'" y1="'+cy+'" x2="'+(cx+r)+'" y2="'+cy+'" stroke="#c76c4f" stroke-width="2.5"/>'
+      +'<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="#c76c4f"/>'
+      +'<text x="'+(cx+r/2)+'" y="'+(cy-8)+'" text-anchor="middle" fill="#8b4735" font-size="11" font-weight="700">'+label+'</text>';
+    const diameterLine=(cx,cy,r,label)=>
+      '<line x1="'+(cx-r)+'" y1="'+cy+'" x2="'+(cx+r)+'" y2="'+cy+'" stroke="#c76c4f" stroke-width="2.5"/>'
+      +'<text x="'+cx+'" y="'+(cy-9)+'" text-anchor="middle" fill="#8b4735" font-size="11" font-weight="700">'+label+'</text>';
+    let svg='',description='';
+    if(spec.shape==='circle'){
+      svg=circleSvg(160,91,61);
+      if(spec.label==='radius'){
+        svg+=radiusLine(160,91,61,'r = '+esc(n(spec.value))+' '+unit);
+        description='已知圓形半徑 '+n(spec.value)+spec.unit;
+      }else if(spec.label==='diameter'){
+        svg+=diameterLine(160,91,61,'d = '+esc(n(spec.value))+' '+unit);
+        description='已知圓形直徑 '+n(spec.value)+spec.unit;
+      }else{
+        svg+='<path d="M160 30 A61 61 0 1 1 159.9 30" fill="none" stroke="#f49f4e" stroke-width="4" stroke-dasharray="8 5"/>'
+          +'<text x="160" y="94" text-anchor="middle" font-size="15" font-weight="800" fill="#254c59">C = '+esc(n(spec.value))+' '+unit+'</text>';
+        description='已知圓周長 '+n(spec.value)+spec.unit+'，未標出半徑';
+      }
+    }else if(spec.shape==='semicircle'){
+      svg='<path d="M99 104 A61 61 0 0 1 221 104 L99 104 Z" fill="#c8e6db" stroke="#299982" stroke-width="3"/>'
+        +radiusLine(160,104,61,'r = '+esc(n(spec.value))+' '+unit);
+      description='半圓與直徑，已知半徑 '+n(spec.value)+spec.unit;
+    }else if(spec.shape==='pair'){
+      const a=Number(spec.first)||1,b=Number(spec.second)||1;
+      const scale=Math.max(a,b),r1=Math.max(18,Math.round(a/scale*52)),r2=Math.max(18,Math.round(b/scale*52));
+      svg=circleSvg(90,90,r1,'#d9ebfd')+circleSvg(230,90,r2,'#bde7de')
+        +radiusLine(90,90,r1,'r='+esc(n(a)))+radiusLine(230,90,r2,'r='+esc(n(b)))
+        +'<text x="90" y="166" text-anchor="middle" font-size="13" fill="#395571">甲圓</text>'
+        +'<text x="230" y="166" text-anchor="middle" font-size="13" fill="#395571">乙圓</text>';
+      description='兩圓半徑分別為 '+n(a)+' 與 '+n(b)+spec.unit;
+    }else if(spec.shape==='ring'){
+      svg=circleSvg(160,88,64,'#bde7de')+circleSvg(160,88,35,'#ffffff')
+        +radiusLine(160,88,64,'外 r='+esc(n(spec.outer)))
+        +'<text x="160" y="158" text-anchor="middle" fill="#3d5666" font-size="13">內半徑 '+esc(n(spec.inner))+' '+unit+'</text>';
+      description='同心圓環的外半徑 '+n(spec.outer)+'、內半徑 '+n(spec.inner)+spec.unit;
+    }else if(spec.shape==='square-circle'){
+      svg='<rect x="99" y="30" width="122" height="122" fill="#ffead2" stroke="#ce8e4e" stroke-width="2"/>'
+        +circleSvg(160,91,61,'#bde7de')+radiusLine(160,91,61,'r='+esc(n(spec.value)))
+        +'<text x="160" y="169" text-anchor="middle" fill="#3d5666" font-size="12">正方形內切圓</text>';
+      description='正方形中的內切圓，已知半徑 '+n(spec.value)+spec.unit;
+    }
+    return '<figure class="circle-diagram" role="img" aria-label="'+esc(description)+'"><svg viewBox="0 0 320 183" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'+svg
+      +'</svg><figcaption>🔵 圓周率 π = 3.14　｜　周長 C = 2 × π × r　｜　面積 A = π × r × r</figcaption></figure>';
+  }
+
   function renderQuestion(){
     const el=$('question-panel'),p=state.pending;
     if(!p || (p.type!=='buying'&&p.type!=='story'&&!p.question)){el.hidden=true;return;}
@@ -955,7 +1011,7 @@
       const formatChange=n=>n>0?'獲得 '+money(n):n<0?'支出 '+money(-n):'金額不變';
       el.innerHTML=`<div class="question-tag">🔮 劇情選擇 · ${esc(info.title||'命運事件')}</div>
         <h3>📜 ${esc(info.scene||'神祕事件發生了！')}</h3>
-        <p class="story-hint">${turn?'選擇後會出現一道小數題，答對或答錯會依選擇決定結果。':'👀 觀戰中：只有當回合玩家能決定命運。'}</p>
+        <p class="story-hint">${turn?'選擇後會出現一道圓周長或圓面積題，答對或答錯會依選擇決定結果。':'👀 觀戰中：只有當回合玩家能決定命運。'}</p>
         <div class="story-choices">${options.map(c=>`<button class="story-choice" data-story-choice="${esc(c.id)}" ${!turn?'disabled':''}><strong>${esc(c.label)}</strong><span>${esc(c.detail)}</span><small>✅ 答對：${formatChange(c.success)}<br>📘 未答對：${formatChange(c.fail)}</small></button>`).join('')}</div>
         <div id="story-timer-label" class="question-hint"></div>`;
       el.querySelectorAll('[data-story-choice]').forEach(btn=>btn.addEventListener('click',()=>{
@@ -978,7 +1034,7 @@
     const spectatorNote=isMyTurn()?'選出正確答案；作答送出後不能更改。':hasGuessed?'✅ 你已送出觀戰猜題，答案保密，等待揭曉。':'👀 你也可以選一個答案參與觀戰猜題；不會扣款，也不計入正式答題分數。';
     const eventHeader=p.card?`<div class="event-card-head">🎴 ${esc(p.card.title)}<small>${esc(p.card.choiceLabel||'')}${p.card.detail?'｜'+esc(p.card.detail):''}</small></div>`:'';
     const nextRound=p.total>1?` · 第 ${p.stage} / ${p.total} 題`:'';
-    el.innerHTML=`<div class="question-tag">📝 ${esc(typeNames[p.type]||'數學挑戰')}${nextRound}</div>${eventHeader}<h3>${esc(p.question.text)}</h3><div class="timer-bar"><div id="timer-fill" class="timer-fill"></div></div><div id="timer-label" class="question-hint"></div><div class="options">${opts.map((option,i)=>`<button class="option-btn${hasGuessed&&poll?.myChoice===i?' spectator-selected':''}" data-${turn?'choice':'spectator-choice'}="${i}" ${!turn&&!canGuess?'disabled':''}><span style="opacity:.55">${'ABCD'[i]}.</span> ${esc(option)}</button>`).join('')}</div><div class="question-hint">${spectatorNote}${poll?'｜已有 '+poll.submitted+' / '+poll.total+' 位觀戰者提交':''}</div>`;
+    el.innerHTML=`<div class="question-tag">📝 ${esc(typeNames[p.type]||'數學挑戰')}${nextRound}</div>${eventHeader}<h3>${esc(p.question.text)}</h3>${renderCircleDiagram(p.question.diagram)}<div class="timer-bar"><div id="timer-fill" class="timer-fill"></div></div><div id="timer-label" class="question-hint"></div><div class="options">${opts.map((option,i)=>`<button class="option-btn${hasGuessed&&poll?.myChoice===i?' spectator-selected':''}" data-${turn?'choice':'spectator-choice'}="${i}" ${!turn&&!canGuess?'disabled':''}><span style="opacity:.55">${'ABCD'[i]}.</span> ${esc(option)}</button>`).join('')}</div><div class="question-hint">${spectatorNote}${poll?'｜已有 '+poll.submitted+' / '+poll.total+' 位觀戰者提交':''}</div>`;
     el.querySelectorAll('[data-choice]').forEach(b=>b.addEventListener('click',()=>{
       const index=Number(b.dataset.choice);
       el.querySelectorAll('[data-choice]').forEach(x=>x.disabled=true);
@@ -1020,7 +1076,7 @@
     if(!r){el.hidden=true;return;}
     el.hidden=false;el.classList.toggle('is-wrong',!r.correct);
     const questionHtml=r.questionText?`<div class="result-question"><div class="result-question-heading">📖 本題題目</div>
-      <p class="result-question-text">${esc(r.questionText)}</p>
+      <p class="result-question-text">${esc(r.questionText)}</p>${renderCircleDiagram(r.questionDiagram)}
       <div class="result-question-options">${(r.questionOptions||[]).map((answer,index)=>{
         const isCorrect=index===r.correctIndex,wasSelected=index===r.selectedIndex;
         return `<div class="result-question-option${isCorrect?' is-correct':''}${wasSelected&&!isCorrect?' is-selected-wrong':''}">

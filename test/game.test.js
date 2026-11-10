@@ -21,7 +21,7 @@ function chooseCorrect(room) {return room.pending.question.correctIndex;}
 function chooseWrong(room) {return (room.pending.question.correctIndex+1)%4;}
 
 test('題庫各類別存在、每題 4 個不同選項，共超過 75 題',()=>{
-  assert.equal(TOTAL,341,`題庫數量有誤：${TOTAL}`);
+  assert.equal(TOTAL,400,`題庫數量有誤：${TOTAL}`);
   for(const type of ['purchase','calc','discount','compare','scam','chest','chance','fate','boss','rescue']){
     assert.ok(BANK[type]?.length>=33,`${type} 題數不足`);
     for(const q of BANK[type]) assert.equal(new Set([q.answer,...q.distractors]).size,4,q.id);
@@ -159,14 +159,12 @@ test('每次擲骰附有唯一事件 ID、起點與終點，供全房間重播�
   assert.equal(second.position,2);
 });
 
-test('80 元打 7.5 折：省下 20 元、售價 60 元的題目解析完整且不混淆',()=>{
-  const discount=BANK.discount.find(q=>q.question.includes('原價 80 元'));
-  const scam=BANK.scam.find(q=>q.question.includes('原價 80 元'));
-  assert.ok(discount);assert.equal(discount.answer,'20 元');
-  assert.match(discount.explanation,/80 × 0\.75 = 60/);
-  assert.match(discount.explanation,/80 − 60 = 20/);
-  assert.ok(scam);assert.equal(scam.answer,'60 元');
-  assert.match(scam.explanation,/多收了 10 元/);
+test('圓周率 3.14：半徑 3 公尺周長 18.84 公尺，附圖只顯示題幹已知條件',()=>{
+  const q=BANK.purchase[0];
+  assert.equal(q.answer,'18.84 公尺');
+  assert.match(q.explanation,/3 × 2 × 3\.14 = 18\.84/);
+  assert.deepEqual(q.diagram,{shape:'circle',label:'radius',value:3,unit:'公尺'});
+  assert.ok(BANK.calc.some(item=>item.skill==='inverse'&&item.diagram.label==='circumference'));
 });
 
 
@@ -200,15 +198,19 @@ test('每題預設 120 秒、房主可調整至 180 秒，30 分鐘結算上限'
   assert.ok(other.pending.expiresAt-Date.now()>=179000);
 });
 
-test('341 題均有具體情境和完整解析、對比價／折扣關鍵量明確',()=>{
+test('400 題全部採用 3.14，題目、分技能圖與完整解析一致',()=>{
   for(const qs of Object.values(BANK))for(const q of qs){
     assert.ok(q.question.length>=33,`${q.id} 題目太短`);
     assert.ok(q.explanation.includes('解題步驟'),`${q.id} 缺解析`);
     assert.ok(q.explanation.includes('解題提醒'),`${q.id} 缺提醒`);
+    assert.ok(q.question.includes('圓周率取 3.14'),q.id);
+    assert.ok(q.diagram?.shape,q.id);
+    assert.ok(q.answer,q.id);
+    assert.equal(new Set([q.answer,...q.distractors]).size,4,q.id);
   }
-  assert.match(BANK.discount[6].question,/省下多少元/);
-  assert.match(BANK.scam[4].question,/應付售價/);
-  assert.match(BANK.boss[6].question,/半箱/);
+  assert.ok(BANK.discount.some(q=>q.skill==='area'));
+  assert.ok(BANK.scam.some(q=>q.skill==='combined'));
+  assert.ok(BANK.boss.some(q=>q.diagram.shape==='ring'));
 });
 
 test('租金先扣，再雙人猜拳，伺服器不外洩雙方未公開的手勢',()=>{
@@ -374,14 +376,14 @@ test('有限輪仍依正常規則結算；房主在無限輪可主動提前結�
   assert.equal(created.room.status,'finished');
 });
 
-test('91 道題目均有一個有效的數學能力分類，包括機會、命運、Boss',()=>{
+test('400 題每題都有圓形學習能力分類，包括機會、命運、Boss',()=>{
   for(const qs of Object.values(BANK))for(const q of qs){
     assert.ok(SKILLS[q.skill],`${q.id} 沒有正確技能標籤`);
   }
-  assert.equal(BANK.chance[0].skill,'discount');
-  assert.equal(BANK.chance[1].skill,'multiply');
-  assert.equal(BANK.boss[2].skill,'unit');
-  assert.equal(BANK.scam[4].skill,'discount');
+  assert.equal(BANK.chance[0].skill,'inverse');
+  assert.equal(BANK.chance[1].skill,'compare');
+  assert.equal(BANK.boss[2].skill,'circumference');
+  assert.equal(BANK.scam[4].skill,'area');
 });
 
 test('依實際數學能力分類錯題；錯誤數與正確率、解析都正確',()=>{
@@ -397,14 +399,14 @@ test('依實際數學能力分類錯題；錯誤數與正確率、解析都正�
   assert.equal(feedback.attempted,2);
   assert.equal(feedback.correct,1);
   assert.equal(feedback.accuracy,50);
-  assert.equal(feedback.weakSkills[0].name,'折扣、折數與省錢');
+  assert.equal(feedback.weakSkills[0].name,'由周長反求半徑');
   assert.equal(feedback.weakSkills[0].wrong,1);
   assert.equal(feedback.examples[0].questionId,'chance-1');
   assert.match(feedback.examples[0].explanation,/解題步驟/);
   assert.equal(game.publicState(room,student.id).personalFeedback.attempted,0);
   assert.equal(game.publicState(room).personalFeedback,null);
   assert.equal(game.publicState(room,student.id).classFeedback.attempted,2);
-  assert.equal(game.publicState(room,student.id).classFeedback.bySkill.find(s=>s.key==='discount').wrong,1);
+  assert.equal(game.publicState(room,student.id).classFeedback.bySkill.find(s=>s.key==='inverse').wrong,1);
   assert.equal(JSON.stringify(game.publicState(room,student.id)).includes(BANK.chance[0].question),false);
 });
 
@@ -478,7 +480,7 @@ test('同局結束後學生可提交並修改文字回饋，房主可查看，�
   game.start(room,host.id);
   assert.throws(()=>game.saveReflection(room,first.id,'遊戲進行中'),GameError);
   game.finishByHost(room,host.id);
-  const firstText='我學到了 7.5 折是原價乘以 0.75。';
+  const firstText='我學到圓周長是直徑乘以 3.14。';
   game.saveReflection(room,first.id,firstText);
   assert.equal(game.publicState(room,first.id).myReflection.text,firstText);
   assert.equal(game.publicState(room,first.id).hostReflections,null);
@@ -619,17 +621,22 @@ test('成就與稱號：正式答題、購地達標自動解鎖，結算後保�
   game.ask(room,'calc');
   game.answer(room,host.id,chooseCorrect(room));
   assert.ok(host.achievements.includes('first_answer'));
-  for(let n=0;n<2;n++){game.ask(room,'discount');game.answer(room,host.id,chooseCorrect(room));}
+  const achievementQuestions=BANK.discount.filter(q=>q.skill==='circumference').slice(0,2);
+  assert.equal(achievementQuestions.length,2);
+  for(const q of achievementQuestions){
+    room.questionQueues.discount=[q.id];
+    game.ask(room,'discount');game.answer(room,host.id,chooseCorrect(room));
+  }
   assert.ok(host.achievements.includes('three_correct'));
-  assert.ok(host.achievements.includes('discount_master'));
+  assert.ok(host.achievements.includes('circumference_master'));
   game.ask(room,'purchase',{tileId:1});
   game.answer(room,host.id,chooseCorrect(room));
   game.decideBuy(room,host.id,true);
   assert.ok(host.achievements.includes('first_property'));
-  game.equipTitle(room,host.id,'discount_master');
+  game.equipTitle(room,host.id,'circumference_master');
   game.finishByHost(room,host.id);
-  assert.equal(game.publicState(room,host.id).rankings.find(p=>p.id===host.id).titleId,'discount_master');
-  assert.equal(game.publicState(room,host.id).players.find(p=>p.id===host.id).titleId,'discount_master');
+  assert.equal(game.publicState(room,host.id).rankings.find(p=>p.id===host.id).titleId,'circumference_master');
+  assert.equal(game.publicState(room,host.id).players.find(p=>p.id===host.id).titleId,'circumference_master');
   game.reset(room,host.id);
   assert.equal(host.titleId,null);
   assert.deepEqual(host.achievements,[]);
@@ -656,7 +663,7 @@ test('v1.8.0 房主可新增機器人、不重複動物或暱稱、六人上限�
   assert.equal(first.token,null);
   assert.equal(first.socketId,null);
   assert.equal(first.animal,ANIMALS[1]);
-  assert.equal(first.name,'小數機器人1');
+  assert.equal(first.name,'圓形機器人1');
   assert.equal(game.publicState(room,host.id).players[1].isBot,true);
   assert.ok(!JSON.stringify(game.publicState(room,host.id)).includes('"token"'));
   assert.throws(()=>game.findSession(room.code,null),GameError);
@@ -681,7 +688,7 @@ test('v1.8.0 機器人與真人混合入房；只有房主能在等待室移除�
   assert.equal(room.players.length,2);
   assert.equal(room.players[1].id,student.id);
   const next=game.addBot(room,host.id);
-  assert.equal(next.name,'小數機器人1');
+  assert.equal(next.name,'圓形機器人1');
   game.start(room,host.id);
   assert.throws(()=>game.addBot(room,host.id),GameError);
   assert.throws(()=>game.removeBot(room,host.id,next.id),GameError);
@@ -1054,7 +1061,7 @@ test('v1.9.0 題庫循環後第一題不能等於上一輪最後一題',()=>{
   assert.equal(new Set(firstCycle).size,BANK.purchase.length);
   const next=game.takeQuestion(room,'purchase');
   assert.notEqual(next.id,firstCycle.at(-1));
-  assert.equal(TOTAL,341);
+  assert.equal(TOTAL,400);
   for(const [kind,items] of Object.entries(BANK)){
     assert.ok(items.length>=33,kind);
     assert.equal(new Set(items.map(x=>x.id)).size,items.length);
