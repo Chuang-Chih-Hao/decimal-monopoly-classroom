@@ -19,7 +19,8 @@ const SCENES=[
   '公園的圓形花圃','校園的圓形跑道','操場的圓形標誌','班級布置的圓形海報',
   '園遊會的圓形攤位','探險島的圓形廣場','校園的圓形噴泉','森林步道的圓形休息區'
 ];
-const round2=value=>Math.round((value+Number.EPSILON)*100)/100;
+// 所有答案四捨五入到小數點後 1 位；圓周率固定 3.14。
+const round2=value=>Math.round((value+Number.EPSILON)*10)/10;
 const show=value=>String(round2(value));
 const circumference=r=>round2(2*PI*r);
 const area=r=>round2(PI*r*r);
@@ -34,10 +35,10 @@ function numberQuestion(kind,text,value,unit,steps,skill,diagram){
   if(distractors.length!==3)throw new Error('題目干擾選項不夠');
   BANK[kind].push({
     id:kind+'-'+(BANK[kind].length+1),type:kind,
-    question:'本題圓周率取 3.14。'+text,
+    question:'本題圓周率取 3.14，計算結果四捨五入到小數點後第一位。'+text,
     answer:correct+' '+unit,
     distractors:distractors.map(n=>n+' '+unit),
-    explanation:'解題步驟：'+steps+'。解題提醒：'+SKILLS[skill].tip,
+    explanation:'解題步驟：'+steps.replaceAll(' = ',' ≈ ')+'。結果按題意四捨五入到小數點後第一位。解題提醒：'+SKILLS[skill].tip,
     skill,diagram
   });
 }
@@ -52,6 +53,39 @@ function choiceQuestion(kind,text,answer,other,steps,skill,diagram){
     skill,diagram
   });
 }
+// 觀念題有四個選項，是非題只有「正確／錯誤」兩個選項。
+function makeConcept(kind,index,scene,r,unit){
+  const data=[
+   ['要計算圓形地毯的面積，第一步應確認什麼？','半徑的長度','圓周率的單位','直徑有幾個字','圓形的顏色','area','先找半徑，再用半徑 × 半徑 × 3.14'],
+   ['計算圓周長需要哪個算式？','直徑 × 3.14','半徑 × 半徑','直徑 × 直徑 × 3.14','半徑 ÷ 3.14','circumference','圓周長＝直徑 × 3.14'],
+   ['圓周長和圓面積的單位有何不同？','周長用公分，面積用平方公分','周長和面積都用公分','周長和面積都用平方公分','面積用公分，周長用平方公分','radius','長度用公分；面積用平方公分'],
+   ['圓的半徑放大成兩倍，面積會變成原來的幾倍？','4 倍','2 倍','3 倍','8 倍','compare','面積與半徑平方成正比，2 × 2 = 4'],
+   ['已知圓的直徑，計算圓面積的第一步是？','把直徑除以 2 得半徑','把直徑乘以 2','直接把直徑平方','用直徑除以 3.14','radius','半徑是直徑的一半，面積要用半徑平方']
+  ];
+  const [prompt,answer,...rest]=data[index%data.length];
+  const skill=rest[3],steps=rest[4];
+  BANK[kind].push({id:kind+'-'+(BANK[kind].length+1),type:kind,
+   question:'圓形觀念題，圓周率取 3.14。'+scene+'：'+prompt,
+   answer,distractors:rest.slice(0,3),
+   explanation:'解題步驟：'+steps+'。解題提醒：'+SKILLS[skill].tip,
+   skill,diagram:{shape:'circle',label:'radius',value:r,unit}});
+}
+function makeBinary(kind,index,scene,r,unit){
+  const data=[
+    ['圓的直徑等於半徑的兩倍。',true,'radius','直徑＝半徑 × 2'],
+    ['圓面積可以用直徑 × 直徑 × 3.14 計算。',false,'area','面積須以半徑 × 半徑 × 3.14 計算'],
+    ['半徑變成兩倍，圓周長也會變成兩倍。',true,'compare','周長與半徑成正比'],
+    ['半圓的周長只有整圓圓周長的一半，無需加直徑。',false,'combined','半圓周長＝半圓弧長＋直徑'],
+    ['圓面積的單位可以用平方公分。',true,'area','面積要使用平方單位'],
+    ['半徑相同的兩個圓，圓周長會不同。',false,'circumference','半徑相同，周長也相同']
+  ];
+  const [statement,isTrue,skill,steps]=data[(index+KINDS.indexOf(kind))%data.length];
+  BANK[kind].push({id:kind+'-'+(BANK[kind].length+1),type:kind,
+   question:'是非題，圓周率取 3.14。'+scene+'：請判斷以下說法是否正確？'+statement,
+   answer:isTrue?'正確':'錯誤',distractors:[isTrue?'錯誤':'正確'],
+   explanation:'解題步驟：'+steps+'；所以這句話是'+(isTrue?'正確':'錯誤')+'的。解題提醒：'+SKILLS[skill].tip,
+   skill,diagram:{shape:'circle',label:'radius',value:r,unit}});
+}
 function circle(label,value,unit){
   return {shape:'circle',label,value,unit};
 }
@@ -61,11 +95,25 @@ function pair(r1,r2,unit){
 function create(kind,index){
   const category=KINDS.indexOf(kind);
   const scene=SCENES[(index*3+category*5)%SCENES.length];
-  const radius=3+((index*7+category*3)%19);
-  const radius2=radius+2+index%4;
+  const radii=[3,4,5,6,7,8,9,10,12,15];
+  const radius=radii[(index*7+category*3)%radii.length];
+  const radius2=radius+2+(index%3);
   const unit=index%3===0?'公尺':'公分';
   const areaUnit=unit==='公尺'?'平方公尺':'平方公分';
-  const mode=(index+category*3)%13;
+  const MODES={
+    purchase:[0,1,2,3,8,10,11,14],
+    calc:[0,1,4,5,6,13],
+    discount:[2,3,8,10,11,13,14],
+    compare:[6,7,12,14,13],
+    scam:[13,14,3,11,13],
+    chest:[0,4,2,13,14],
+    chance:[0,2,6,13,14],
+    fate:[4,3,9,13,14],
+    boss:[8,9,10,11,7,14],
+    rescue:[0,1,2,4,13,14]
+  };
+  const kinds=MODES[kind];
+  const mode=kinds[(index+Math.floor(index/kinds.length))%kinds.length];
   const c=circumference(radius),a=area(radius),d=radius*2;
   const prefix=kind==='boss'?'Boss 幾何挑戰：':kind==='chest'?'圓形寶箱密碼：':kind==='rescue'?'緊急幾何救援：':'';
   if(mode===0){
@@ -82,10 +130,10 @@ function create(kind,index){
       a,areaUnit,show(d)+' ÷ 2 = '+show(radius)+'（'+unit+'）；'+show(radius)+' × '+show(radius)+' × 3.14 = '+show(a)+'（'+areaUnit+'）','area',circle('diameter',d,unit));
   }else if(mode===4){
     numberQuestion(kind,prefix+scene+'量得整圈圓周長為 '+show(c)+unit+'，求出這個圓的半徑是多少？',
-      radius,unit,show(c)+' ÷ 3.14 = '+show(d)+'（'+unit+'，直徑）；'+show(d)+' ÷ 2 = '+show(radius)+'（'+unit+'，半徑）','inverse',circle('circumference',c,unit));
+      radius,unit,show(c)+' ÷ 3.14 ≈ '+show(d)+'（'+unit+'，直徑）；'+show(d)+' ÷ 2 = '+show(radius)+'（'+unit+'，半徑）','inverse',circle('circumference',c,unit));
   }else if(mode===5){
     numberQuestion(kind,prefix+scene+'的圓周長為 '+show(c)+unit+'，若要測量圓形最寬的直線距離，直徑是多少？',
-      d,unit,show(c)+' ÷ 3.14 = '+show(d)+'（'+unit+'）','inverse',circle('circumference',c,unit));
+      d,unit,show(c)+' ÷ 3.14 ≈ '+show(d)+'（'+unit+'）','inverse',circle('circumference',c,unit));
   }else if(mode===6){
     numberQuestion(kind,prefix+scene+'的半徑為 '+radius+unit+'，若把半徑增加到原來的兩倍，新的圓周長是多少？',
       circumference(radius*2),unit,'新半徑＝'+radius+' × 2 = '+(radius*2)+'；新圓周長＝'+(radius*2)+' × 2 × 3.14 = '+show(circumference(radius*2))+'（'+unit+'）','compare',pair(radius,radius*2,unit));
@@ -97,8 +145,8 @@ function create(kind,index){
     numberQuestion(kind,prefix+scene+'改成半圓形，原本整個圓的半徑是 '+r+unit+'。只求半圓的面積，應是多少？',
       round2(area(r)/2),areaUnit,'整圓面積＝'+r+' × '+r+' × 3.14 = '+show(area(r))+'；半圓面積＝'+show(area(r))+' ÷ 2 = '+show(area(r)/2)+'（'+areaUnit+'）','combined',{shape:'semicircle',label:'radius',value:r,unit});
   }else if(mode===9){
-    numberQuestion(kind,prefix+scene+'做成半圓形，原本整圓半徑為 '+radius+unit+'。含下方直徑的完整半圓周界是多少？',
-      round2(PI*radius+2*radius),unit,'弧長＝3.14 × '+radius+' = '+show(PI*radius)+'；再加直徑 '+d+'；周界＝'+show(PI*radius+2*radius)+'（'+unit+'）','combined',{shape:'semicircle',label:'radius',value:radius,unit});
+    numberQuestion(kind,prefix+scene+'做成半圓形，原本整圓半徑為 '+radius+unit+'。包含弧線和直徑的半圓周長是多少？',
+      round2(PI*radius+2*radius),unit,'弧長＝3.14 × '+radius+' = '+show(PI*radius)+'；再加直徑 '+d+'；半圓周長＝'+show(PI*radius+2*radius)+'（'+unit+'）','combined',{shape:'semicircle',label:'radius',value:radius,unit});
   }else if(mode===10){
     const outer=radius+3,inner=radius;
     numberQuestion(kind,prefix+scene+'有一個圓環形區域，外圓半徑 '+outer+unit+'，內圓半徑 '+inner+unit+'。圓環面積是多少？',
@@ -106,6 +154,10 @@ function create(kind,index){
   }else if(mode===11){
     numberQuestion(kind,prefix+scene+'有一個邊長 '+d+unit+' 的正方形，裡面正好畫一個內切圓，圓的半徑 '+radius+unit+'。正方形扣掉圓的面積是多少？',
       round2(d*d-a),areaUnit,'正方形面積＝'+d+' × '+d+' = '+(d*d)+'；圓面積＝'+radius+' × '+radius+' × 3.14 = '+show(a)+'；相減＝'+show(d*d-a)+'（'+areaUnit+'）','combined',{shape:'square-circle',label:'radius',value:radius,unit});
+  }else if(mode===13){
+    makeBinary(kind,index,scene,radius,unit);
+  }else if(mode===14){
+    makeConcept(kind,index,scene,radius,unit);
   }else{
     choiceQuestion(kind,prefix+scene+'有甲、乙兩個完整圓，甲圓半徑 '+radius+unit+'，乙圓半徑 '+radius2+unit+'。如果比較兩圓的面積，哪一個比較大？',
       '乙圓','甲圓','甲圓面積＝'+show(area(radius))+'（'+areaUnit+'）；乙圓面積＝'+show(area(radius2))+'（'+areaUnit+'）。因為 '+show(area(radius2))+' > '+show(area(radius))+'，乙圓較大。','compare',pair(radius,radius2,unit));

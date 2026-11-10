@@ -1,7 +1,7 @@
 /* 圓形富翁前端：所有資產、擲骰、判分都以伺服器狀態為準。 */
 (() => {
   'use strict';
-  const CLIENT_VERSION='2.0.0';
+  const CLIENT_VERSION='2.1.0';
   const socket=io({transports:['websocket','polling'],reconnection:true});
   const sound=window.DecimalMonopolyAudio;
   const playSound=(kind,detail)=>sound?.play(kind,detail);
@@ -291,6 +291,14 @@
       const winner=next.players.find(p=>p.id===duel.winnerId);
       const item={icon:winner?'🏆':'🤝',title:winner?`${winner.name} 在雙人對決中獲勝！`:'雙人對決平手！',
         detail:winner?`輸家額外補貼 ${money(duel.paid)}，完成本次房產互動。`:'不用額外付零用錢。',kind:winner?'success':'event'};
+      if(activeRollAnimation)deferredFeedback=item;
+      else showSpotlight(item.icon,item.title,item.detail,item.kind);
+      return;
+    }
+    if(next.lastCard?.id&&next.lastCard.id!==previous.lastCard?.id){
+      const card=next.lastCard;
+      const item={icon:card.icon||'🃏',title:(card.kind==='chance'?'🍀 機會卡':'🔮 命運卡')+'：'+card.title,
+        detail:card.outcome||card.detail,kind:card.effect==='lose'||card.effect==='lose-to'?'warning':'event'};
       if(activeRollAnimation)deferredFeedback=item;
       else showSpotlight(item.icon,item.title,item.detail,item.kind);
       return;
@@ -818,7 +826,7 @@
     if(!valid())return;
     // 抵達後重新畫棋盤：動物會恢復成 v1.5 的小棋子圖示。
     activeRollAnimation=null;
-    renderBoard();renderTurnActions();renderQuestion();renderDuel();
+    renderBoard();renderTurnActions();renderQuestion();renderDuel();syncQuestionPanelPosition();
     focusMapTile(roll.position);
     playLandingTileEffect(roll.position);
     if((state.log||[]).some(l=>l.at>=roll.at&&/支付.*過路費/.test(l.text))){
@@ -853,7 +861,7 @@
     const result=$('result-panel');
     if(!sidebar||!question||!current||!result)return;
     const questionFirst=state?.status==='playing'
-      && (state.phase==='answering'||state.phase==='story')
+      && (state.phase==='answering'||state.phase==='story'||state.phase==='card-draw')
       && !question.hidden;
     sidebar.classList.toggle('question-priority',questionFirst);
     if(questionFirst){
@@ -883,6 +891,8 @@
     if(phase==='rolling'){
       el.innerHTML=turn?'<button id="roll-btn" class="btn primary roll-btn">🎲 擲骰子！</button><div class="phase-help">點擊後會沿著地圖前進 1～6 格。</div>':`<div class="phase-help">等待 ${esc(activePlayer()?.name)} 擲骰子…</div>`;
       $('roll-btn')?.addEventListener('click',()=>request('roll'));
+    }else if(phase==='card-draw'){
+      el.innerHTML='<div class="phase-help">🃏 抵達'+esc(state.pending?.kind==='chance'?'機會':'命運')+'抽牌格！'+(turn?'請在下方親自抽取一張卡牌。':'等待當回合玩家抽牌…')+'</div>';
     }else if(phase==='jail-choice'){
       const cash=activePlayer()?.cash||0;
       el.innerHTML=`<div class="jail-choice"><h3>🚔 監獄抉擇</h3>
@@ -892,8 +902,13 @@
             <button id="jail-pay" type="button" class="btn warning" ${cash<(state.jailBail||80)?'disabled':''}>💰 付 ${money(state.jailBail||80)} 出獄</button></div>`
           :'<div class="phase-help">等待獄中的玩家選擇…</div>'}
         <div id="jail-timer" class="phase-help"></div></div>`;
-      $('jail-serve')?.addEventListener('click',()=>request('jailDecision',{pay:false}));
-      $('jail-pay')?.addEventListener('click',()=>request('jailDecision',{pay:true}));
+      function jailAction(pay){
+        if(!socket.connected){showToast('連線中，請稍後重試。',true);return;}
+        for(const btn of el.querySelectorAll('.jail-actions button'))btn.disabled=true;
+        request('jailDecision',{pay},ok=>{if(!ok&&state?.phase==='jail-choice')renderTurnActions();});
+      }
+      $('jail-serve')?.addEventListener('click',()=>jailAction(false));
+      $('jail-pay')?.addEventListener('click',()=>jailAction(true));
       updateTimer();
     }else if(phase==='story'){
       el.innerHTML=`<div class="phase-help">${turn?'🔮 命運事件！請選擇一條冒險路線。':'🔮 '+esc(activePlayer()?.name)+' 正在決定命運分支！'}</div>`;
@@ -905,8 +920,11 @@
       const d=state.duel;
       el.innerHTML='<div class="phase-help">⚔️ 屋主與租客正在玩剪刀石頭布！雙方出手後才公開手勢；請看下方對戰區。</div>';
     }else if(phase==='between'){
+      const card=state.lastCard;
+      const cardSummary=card&&card.playerId===state.currentPlayerId&&card.effect!=='quiz'
+        ?'<div class="card-summary">'+esc(card.icon)+' 抽牌結果：<strong>'+esc(card.title)+'</strong> — '+esc(card.outcome||card.detail)+'</div>':'';
       const countdown='<div class="phase-help between-turn-help" id="between-timer" aria-live="off"></div>';
-      el.innerHTML=turn?'<button id="next-btn" class="btn primary full">➡️ 完成回合，換下一位</button>'+countdown
+      el.innerHTML=turn?cardSummary+'<button id="next-btn" class="btn primary full">➡️ 完成回合，換下一位</button>'+countdown
         :`<div class="phase-help">等待 ${esc(activePlayer()?.name)} 結束回合…</div>`+countdown;
       $('next-btn')?.addEventListener('click',()=>request('next'));
       updateTimer();
@@ -1002,9 +1020,27 @@
 
   function renderQuestion(){
     const el=$('question-panel'),p=state.pending;
-    if(!p || (p.type!=='buying'&&p.type!=='story'&&!p.question)){el.hidden=true;return;}
+    // 角色確實跳到目的地後才顯示題目或抽牌；移動期間也不會看到選項。
+    if(activeRollAnimation||!p||(p.type!=='buying'&&p.type!=='story'&&p.type!=='card-draw'&&!p.question)){
+      el.hidden=true;return;
+    }
     el.hidden=false;
     const turn=isMyTurn()&&!activeRollAnimation;
+    if(p.type==='card-draw'){
+      const isChance=p.kind==='chance';
+      el.innerHTML='<div class="question-tag">'+(isChance?'🍀 機會卡':'🔮 命運卡')+'</div>'
+        +'<div class="draw-card-back" aria-hidden="true">'+(isChance?'🍀':'🔮')+'</div>'
+        +'<h3>抽一張'+(isChance?'機會':'命運')+'卡，看看會發生什麼事！</h3>'
+        +'<p class="question-hint">可能有寶箱、現金轉移、突發費用或圓形數學挑戰；卡片內容由伺服器隨機決定。</p>'
+        +(turn?'<button id="draw-card-btn" class="btn primary full" type="button">🃏 抽一張牌</button>'
+        :'<p class="question-hint">👀 等待 '+esc(activePlayer()?.name)+' 翻牌…</p>');
+      $('draw-card-btn')?.addEventListener('click',()=>{
+        if(!socket.connected){showToast('連線中，請稍後再試。',true);return;}
+        const btn=$('draw-card-btn');if(btn)btn.disabled=true;
+        request('drawCard',{},ok=>{if(!ok&&state?.phase==='card-draw')renderQuestion();});
+      });
+      return;
+    }
     if(p.type==='story'){
       const info=p.story||{};
       const options=info.choices||[];

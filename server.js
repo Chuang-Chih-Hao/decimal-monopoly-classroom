@@ -129,6 +129,12 @@ io.on('connection',(socket)=>{
   socket.on('spectatorGuess',action(({index})=>{
     const {room,playerId}=identity();games.spectatorGuess(room,playerId,index);broadcast(room);
   }));
+  socket.on('jailDecision',action(({pay})=>{
+    const {room,playerId}=identity();games.decideJail(room,playerId,pay===true);broadcast(room);
+  }));
+  socket.on('drawCard',action(()=>{
+    const {room,playerId}=identity();games.drawCard(room,playerId);broadcast(room);
+  }));
   socket.on('storyChoice',action(({choiceId})=>{
     const {room,playerId}=identity();games.chooseStory(room,playerId,choiceId);broadcast(room);
   }));

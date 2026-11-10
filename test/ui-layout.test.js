@@ -591,7 +591,7 @@ test('v1.8.3 其他長事件也不截斷，且標題與訊息有獨立一致的�
   assert.match(css,/\.event-spotlight \.spotlight-copy \.spotlight-detail\s*\{[^}]*font-size:/);
   assert.match(css,/\.spotlight-detail\s*\{[^}]*overflow-wrap:anywhere/);
   assert.match(css,/@media\(max-width:640px\)\{[^}]*\.event-spotlight \.spotlight-copy \.spotlight-title/);
-  assert.ok(index.includes('/app.js?v=2.0.0'));
+  assert.ok(index.includes('/app.js?v=2.1.0'));
 });
 
 
@@ -687,4 +687,34 @@ test('v2.0.0 圓形教學圖在答題前不透露正解或計算後的半徑',()
   const area=builder({shape:'square-circle',label:'radius',value:7,unit:'公分'});
   assert.ok(area.includes('正方形內切圓'));
   assert.equal(builder({shape:'unknown',value:7,unit:'公分'}),'');
+});
+
+test('v2.1.0 監獄操作已綁定伺服器 jailDecision，避免按鍵只有畫面沒效果',()=>{
+  const server=fs.readFileSync(path.join(__dirname,'../server.js'),'utf8');
+  assert.ok(server.includes("socket.on('jailDecision'"));
+  assert.ok(server.includes('games.decideJail(room,playerId,pay===true)'));
+  assert.ok(app.includes("request('jailDecision',{pay}"));
+  assert.ok(app.includes("if(!ok&&state?.phase==='jail-choice')renderTurnActions()"));
+  const css=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
+  assert.ok(css.includes('touch-action:manipulation'));
+});
+test('v2.1.0 棋子跳完後才出現數學題、選項與抽牌按鈕',()=>{
+  assert.ok(app.includes('if(activeRollAnimation||!p'), '移動期間必須隱藏題目');
+  assert.ok(app.includes("renderBoard();renderTurnActions();renderQuestion();renderDuel();syncQuestionPanelPosition()"));
+  assert.ok(app.includes("state.phase==='card-draw'"));
+  assert.ok(app.includes("request('drawCard'"));
+  assert.ok(app.includes('draw-card-btn'));
+  assert.ok(app.includes('lastCard'));
+  assert.ok(index.includes('🃏 機會與命運抽牌'));
+});
+test('v2.1.0 遊戲有實際抽牌動畫，機會與命運均含不同種類事件',()=>{
+  const game=fs.readFileSync(path.join(__dirname,'../game.js'),'utf8');
+  const css=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
+  for(const key of ["id:'treasure'","id:'steal'","id:'quiz'","id:'pickpocket'","id:'fine'"])
+    assert.ok(game.includes(key),key);
+  assert.ok(game.includes("room.phase='card-draw'"));
+  assert.ok(game.includes('drawCard(room,playerId)'));
+  assert.ok(game.includes('lastCard:room.lastCard'));
+  assert.ok(css.includes('.draw-card-back{'));
+  assert.ok(css.includes('.card-summary{'));
 });

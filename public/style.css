@@ -772,3 +772,26 @@
 
 /* v2.0.0：到格動畫進行時，新的圓形圖章也要隱藏，避免與動畫疊圖。 */
 .board .tile.tile-effect-active > .tile-geometry-mark{visibility:hidden}
+
+/* v2.1.0：機會／命運的背面抽牌、翻牌結果，以及監獄按鈕可操作性 */
+.draw-card-back{
+  width:min(142px,45vw);height:184px;display:grid;place-items:center;margin:12px auto 16px;
+  border-radius:17px;border:5px solid #fff9df;outline:2px solid #b2a5ce;
+  background:repeating-linear-gradient(45deg,#546eaa,#546eaa 9px,#617ebc 9px,#617ebc 18px);
+  box-shadow:0 10px 21px #43587b38;font-size:68px;color:white;
+  animation:cardIdle 2.6s ease-in-out infinite alternate;pointer-events:none;
+}
+@keyframes cardIdle{from{transform:rotate(-4deg) translateY(2px)}to{transform:rotate(3deg) translateY(-3px)}}
+.draw-card-back+.question-hint{margin-top:6px}
+.card-summary{padding:12px;border-radius:10px;background:#e9f7f2;
+  color:#285a51;border:1px solid #abd9c5;font-size:13px;line-height:1.65}
+.jail-actions{position:relative;z-index:2}
+.jail-actions button,.jail-choice button{
+  position:relative;z-index:3;pointer-events:auto;touch-action:manipulation;
+  cursor:pointer;min-height:49px;font-size:14px;font-weight:850;
+}
+.jail-choice button:disabled{cursor:not-allowed;opacity:.55}
+.circle-diagram svg text{font-variant-numeric:tabular-nums}
+.circle-diagram .math-value{font-size:11px}
+.option-btn{font-variant-numeric:tabular-nums}
+@media(prefers-reduced-motion:reduce){.draw-card-back{animation:none}}

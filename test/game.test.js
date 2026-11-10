@@ -18,13 +18,13 @@ function forceDie(game,room,playerId,die) {
   try {return game.roll(room,playerId);} finally {Math.random=old;}
 }
 function chooseCorrect(room) {return room.pending.question.correctIndex;}
-function chooseWrong(room) {return (room.pending.question.correctIndex+1)%4;}
+function chooseWrong(room) {return (room.pending.question.correctIndex+1)%room.pending.question.options.length;}
 
-test('題庫各類別存在、每題 4 個不同選項，共超過 75 題',()=>{
+test('題庫各類別存在，觀念四選一與是非二選一均有不同選項',()=>{
   assert.equal(TOTAL,400,`題庫數量有誤：${TOTAL}`);
   for(const type of ['purchase','calc','discount','compare','scam','chest','chance','fate','boss','rescue']){
     assert.ok(BANK[type]?.length>=33,`${type} 題數不足`);
-    for(const q of BANK[type]) assert.equal(new Set([q.answer,...q.distractors]).size,4,q.id);
+    for(const q of BANK[type]) assert.equal(new Set([q.answer,...q.distractors]).size,q.distractors.length+1,q.id);
   }
 });
 
@@ -159,10 +159,10 @@ test('每次擲骰附有唯一事件 ID、起點與終點，供全房間重播�
   assert.equal(second.position,2);
 });
 
-test('圓周率 3.14：半徑 3 公尺周長 18.84 公尺，附圖只顯示題幹已知條件',()=>{
+test('圓周率 3.14：算式保留完整精度，答案通常取到第一位小數',()=>{
   const q=BANK.purchase[0];
-  assert.equal(q.answer,'18.84 公尺');
-  assert.match(q.explanation,/3 × 2 × 3\.14 = 18\.84/);
+  assert.equal(q.answer,'18.8 公尺');
+  assert.match(q.explanation,/3 × 2 × 3\.14/);
   assert.deepEqual(q.diagram,{shape:'circle',label:'radius',value:3,unit:'公尺'});
   assert.ok(BANK.calc.some(item=>item.skill==='inverse'&&item.diagram.label==='circumference'));
 });
@@ -206,7 +206,7 @@ test('400 題全部採用 3.14，題目、分技能圖與完整解析一致',()=
     assert.ok(q.question.includes('圓周率取 3.14'),q.id);
     assert.ok(q.diagram?.shape,q.id);
     assert.ok(q.answer,q.id);
-    assert.equal(new Set([q.answer,...q.distractors]).size,4,q.id);
+    assert.equal(new Set([q.answer,...q.distractors]).size,q.distractors.length+1,q.id);
   }
   assert.ok(BANK.discount.some(q=>q.skill==='area'));
   assert.ok(BANK.scam.some(q=>q.skill==='combined'));
@@ -380,10 +380,10 @@ test('400 題每題都有圓形學習能力分類，包括機會、命運、Boss
   for(const qs of Object.values(BANK))for(const q of qs){
     assert.ok(SKILLS[q.skill],`${q.id} 沒有正確技能標籤`);
   }
-  assert.equal(BANK.chance[0].skill,'inverse');
-  assert.equal(BANK.chance[1].skill,'compare');
-  assert.equal(BANK.boss[2].skill,'circumference');
-  assert.equal(BANK.scam[4].skill,'area');
+  assert.equal(BANK.chance[0].skill,'circumference');
+  assert.equal(BANK.chance[1].skill,'area');
+  assert.equal(BANK.boss[2].skill,'combined');
+  assert.ok(BANK.scam[4].skill in SKILLS);
 });
 
 test('依實際數學能力分類錯題；錯誤數與正確率、解析都正確',()=>{
@@ -399,14 +399,14 @@ test('依實際數學能力分類錯題；錯誤數與正確率、解析都正�
   assert.equal(feedback.attempted,2);
   assert.equal(feedback.correct,1);
   assert.equal(feedback.accuracy,50);
-  assert.equal(feedback.weakSkills[0].name,'由周長反求半徑');
+  assert.equal(feedback.weakSkills[0].name,'圓周長計算');
   assert.equal(feedback.weakSkills[0].wrong,1);
   assert.equal(feedback.examples[0].questionId,'chance-1');
   assert.match(feedback.examples[0].explanation,/解題步驟/);
   assert.equal(game.publicState(room,student.id).personalFeedback.attempted,0);
   assert.equal(game.publicState(room).personalFeedback,null);
   assert.equal(game.publicState(room,student.id).classFeedback.attempted,2);
-  assert.equal(game.publicState(room,student.id).classFeedback.bySkill.find(s=>s.key==='inverse').wrong,1);
+  assert.equal(game.publicState(room,student.id).classFeedback.bySkill.find(s=>s.key==='circumference').wrong,1);
   assert.equal(JSON.stringify(game.publicState(room,student.id)).includes(BANK.chance[0].question),false);
 });
 
@@ -573,47 +573,74 @@ test('觀戰連續猜對三題可解鎖觀戰成就，稱號可裝備但不能�
   assert.throws(()=>game.equipTitle(room,student.id,'unknown'),GameError);
 });
 
-test('命運與機會事件新增劇情兩選一，再進入原題庫作答，其他玩家不能選',()=>{
+test('機會與命運以抽牌觸發隨機事件，未抽牌前不能透露內容',()=>{
   const {game,room,host,student}=setup();
   game.land(room,host,BOARD[4]);
-  assert.equal(room.phase,'story');
-  const options=room.pending.choices;
-  assert.equal(options.length,2);
-  assert.ok(options[0].fail>=options[1].fail);
-  const snapshot=game.publicState(room,student.id);
-  assert.ok(snapshot.pending.story.scene.length>10);
-  assert.equal(snapshot.pending.question,undefined);
-  assert.throws(()=>game.chooseStory(room,student.id,'safe'),GameError);
-  assert.throws(()=>game.chooseStory(room,host.id,'hack'),GameError);
-  game.chooseStory(room,host.id,'bold');
-  assert.equal(room.phase,'answering');
-  assert.equal(room.pending.type,'chance');
-  assert.ok(host.achievements.includes('story_brave'));
-  assert.ok(!JSON.stringify(game.publicState(room,student.id)).includes('correctIndex'));
-  const card=room.pending.context.card;
-  assert.equal(card.success,options[1].success);
-  game.answer(room,host.id,chooseCorrect(room));
-  assert.equal(room.phase,'between');
-  assert.ok(room.log.some(l=>l.text.includes('分支')));
+  assert.equal(room.phase,'card-draw');
+  assert.equal(room.pending.kind,'chance');
+  const pub=game.publicState(room,student.id);
+  assert.equal(pub.pending.type,'card-draw');
+  assert.equal(pub.lastCard,null);
+  assert.equal(pub.pending.question,undefined);
+  assert.throws(()=>game.drawCard(room,student.id),GameError);
+  const old=Math.random;Math.random=()=>0;
+  try{
+    const card=game.drawCard(room,host.id);
+    assert.equal(card.title,'撿到寶箱');
+    assert.equal(card.amount,90);
+    assert.equal(host.cash,990);
+    assert.equal(room.phase,'between');
+    assert.equal(game.publicState(room,student.id).lastCard.title,'撿到寶箱');
+  }finally{Math.random=old;}
+  assert.throws(()=>game.drawCard(room,host.id),GameError,'已抽過不能重抽');
 });
 
-test('劇情選擇逾時自動採穩健分支，房主可以略過且不會卡住遊戲',()=>{
-  const {game,room,host}=setup();
-  game.land(room,host,BOARD[8]);
-  const expected=room.pending.choices[0].success;
-  room.pending.expiresAt=Date.now()-1;
-  game.tick(()=>{});
-  assert.equal(room.phase,'answering');
-  assert.equal(room.pending.type,'fate');
-  assert.equal(room.pending.context.card.success,expected);
-  game.nextTurn(room,host.id,true);
-  assert.equal(room.phase,'rolling');
-  room.currentPlayerId=host.id;
-  game.land(room,host,BOARD[23]);
-  assert.equal(room.phase,'story');
-  game.nextTurn(room,host.id,true);
-  assert.equal(room.phase,'rolling');
-  assert.equal(room.pending,null);
+test('機會卡可偷取別人零用錢，命運卡可被偷；金錢守恆且有破產判定',()=>{
+  const {game,room,host,student}=setup();
+  const original=room.players.reduce((sum,p)=>sum+p.cash,0);
+  const old=Math.random;
+  try{
+    // 六張卡第 2 張：攔截金幣，偷對手最多 $60
+    Math.random=()=>.2;
+    game.land(room,host,BOARD[4]);
+    game.drawCard(room,host.id);
+    assert.equal(host.cash,960);assert.equal(student.cash,840);
+    assert.equal(room.players.reduce((sum,p)=>sum+p.cash,0),original);
+    game.nextTurn(room,host.id);
+    Math.random=()=>0; // 命運第一張：小偷來襲
+    game.land(room,student,BOARD[8]);
+    game.drawCard(room,student.id);
+    assert.equal(student.cash,790);assert.equal(host.cash,1010);
+    assert.equal(room.players.reduce((sum,p)=>sum+p.cash,0),original);
+  }finally{Math.random=old;}
+});
+
+test('抽到答題卡才開啟圓形題；超時自動抽牌；房主可略過',()=>{
+  const {game,room,host}=setup();const old=Math.random;
+  try{
+    Math.random=()=>.4; // chance 第 3 張: quiz
+    game.land(room,host,BOARD[4]);
+    const picked=game.drawCard(room,host.id);
+    assert.equal(picked.effect,'quiz');
+    assert.equal(room.phase,'answering');
+    assert.equal(room.pending.type,'chance');
+    assert.equal(room.pending.context.card.success,85);
+    game.answer(room,host.id,chooseCorrect(room));
+    assert.equal(host.cash,985);
+    game.nextTurn(room,host.id,true);
+    room.currentPlayerId=host.id;
+    game.land(room,host,BOARD[23]);
+    assert.equal(room.phase,'card-draw');
+    room.pending.expiresAt=Date.now()-1;Math.random=()=>0;
+    game.tick(()=>{});
+    assert.equal(room.phase,'between');
+    game.nextTurn(room,host.id,true);
+    room.currentPlayerId=host.id;
+    game.land(room,host,BOARD[8]);
+    assert.equal(room.phase,'card-draw');
+    game.nextTurn(room,host.id,true);
+    assert.equal(room.phase,'rolling');assert.equal(room.pending,null);
+  }finally{Math.random=old;}
 });
 
 test('成就與稱號：正式答題、購地達標自動解鎖，結算後保留、重開局清空',()=>{
@@ -722,25 +749,20 @@ test('v1.8.0 房主加一台機器人即可開始，機器人會擲骰、解購�
   } finally {Math.random=previous;}
 });
 
-test('v1.8.0 機器人遇到命運劇情時會自行選分支並完成題目',()=>{
+test('機器人遇到機會或命運格會自動抽牌，避免全班等待',()=>{
   const game=new GameManager();
   const {room,player:host}=game.newRoom('老師','capybara');
   const bot=game.addBot(room,host.id);
-  game.start(room,host.id);
-  game.nextTurn(room,host.id,true);
-  game.land(room,bot,BOARD[8]);
-  assert.equal(room.phase,'story');
-  const previous=Math.random;Math.random=()=>0;
+  game.start(room,host.id);game.nextTurn(room,host.id,true);
+  game.land(room,bot,BOARD[8]);assert.equal(room.phase,'card-draw');
+  const prev=Math.random;Math.random=()=>0;
   try{
     advanceBot(game,room);
-    assert.equal(room.phase,'answering');
-    assert.equal(room.pending.type,'fate');
-    assert.ok(room.pending.context.card.choiceLabel.includes('穩健'));
-    advanceBot(game,room);
-    assert.equal(bot.attempted,1);
-    assert.equal(bot.correct,1);
     assert.equal(room.phase,'between');
-  } finally {Math.random=previous;}
+    assert.equal(room.lastCard.title,'小偷來襲');
+    assert.ok(bot.achievements.includes('story_brave'));
+    assert.ok(room.log.some(l=>l.text.includes('抽到')));
+  }finally{Math.random=prev;}
 });
 
 test('v1.8.0 機器人當屋主時也會自動出招；真人回合正常完成雙人對戰',()=>{
@@ -1065,7 +1087,7 @@ test('v1.9.0 題庫循環後第一題不能等於上一輪最後一題',()=>{
   for(const [kind,items] of Object.entries(BANK)){
     assert.ok(items.length>=33,kind);
     assert.equal(new Set(items.map(x=>x.id)).size,items.length);
-    for(const q of items)assert.equal(new Set([q.answer,...q.distractors]).size,4,q.id);
+    for(const q of items)assert.equal(new Set([q.answer,...q.distractors]).size,q.distractors.length+1,q.id);
   }
 });
 
