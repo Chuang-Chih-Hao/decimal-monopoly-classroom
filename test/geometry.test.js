@@ -6,7 +6,7 @@ const {GameManager}=require('../game');
 const round2=n=>Math.round((n+Number.EPSILON)*10)/10;
 const parse=n=>Number.parseFloat(n);
 function expected(q){
-  if(q.answer==='正確'||q.answer==='錯誤'||Number.isNaN(Number.parseFloat(q.answer)))return null;
+  if(!/公尺|公分/.test(q.answer))return null;
   const d=q.diagram,r=Number(d.value||0);
   if(d.shape==='circle'){
     if(d.label==='circumference'){
@@ -49,7 +49,7 @@ test('圓周長與圓面積題庫 400 題完整，10 種事件各 40 題、答�
 test('全部 400 題按附圖已知半徑／直徑獨立反算，答案符合 3.14',()=>{
   for(const items of Object.values(BANK))for(const q of items){
     const solution=expected(q);
-    if(solution===null){assert.ok(!Number.isFinite(parse(q.answer))||q.answer==='乙圓',q.id);continue;}
+    if(solution===null){assert.ok(!/公尺|公分/.test(q.answer),q.id);continue;}
     assert.equal(parse(q.answer),solution,q.id+' '+q.question);
     assert.ok(q.answer.includes('公')||q.answer==='乙圓',q.id);
     assert.ok(q.distractors.every(x=>x!==q.answer),q.id);

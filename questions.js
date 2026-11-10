@@ -8,7 +8,7 @@ const SKILLS=Object.freeze({
   area:{name:'圓面積計算',tip:'圓面積＝半徑 × 半徑 × 3.14；注意是半徑平方，不是直徑平方。面積單位要寫平方公分、平方公尺。'},
   inverse:{name:'由周長反求半徑',tip:'已知圓周長：先除以 3.14 求直徑，再除以 2 求半徑。'},
   compare:{name:'兩個圓的周長與面積比較',tip:'先確認要比較周長還是面積；半徑放大 2 倍，周長變 2 倍，面積變 4 倍。'},
-  combined:{name:'半圓與複合圖形',tip:'半圓面積是整圓的一半；半圓的完整周界還要加上直徑。陰影面積通常先算大圖，再減小圖。'}
+  combined:{name:'半圓與複合圖形',tip:'半圓面積是整圓的一半；半圓的完整周長還要加上直徑。陰影面積通常先算大圖，再減小圖。'}
 });
 const KINDS=['purchase','calc','discount','compare','scam','chest','chance','fate','boss','rescue'];
 const BANK=Object.fromEntries(KINDS.map(kind=>[kind,[]]));
