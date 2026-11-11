@@ -64,7 +64,13 @@ const CARD_DECKS=Object.freeze({
     {id:'quiz',icon:'📏',title:'圓周長快問快答',detail:'答對拿 $85，未答對不扣錢。',effect:'quiz',success:85,fail:0},
     {id:'prize',icon:'🍀',title:'幸運園遊會',detail:'收到 $45 禮物金。',effect:'gain',amount:45},
     {id:'locked-chest',icon:'🔐',title:'寶箱密碼',detail:'答對寶箱題得 $100，答錯也有 $10。',effect:'quiz',quizKind:'chest',success:100,fail:10},
-    {id:'friends',icon:'💌',title:'朋友的補給',detail:'收到 $35 補給金。',effect:'gain',amount:35}
+    {id:'friends',icon:'💌',title:'朋友的補給',detail:'收到 $35 補給金。',effect:'gain',amount:35},
+    {id:'lucky-draw',icon:'🎰',title:'幸運轉盤',detail:'抽到園遊會大獎 $120。',effect:'gain',amount:120},
+    {id:'class-festival',icon:'🎪',title:'園遊會人氣王',detail:'其他冒險家各送你最多 $15。',effect:'collect-all',amount:15},
+    {id:'rent-pass',icon:'🛡️',title:'租金保護券',detail:'獲得一次免費經過他人房產的機會。',effect:'rent-shield'},
+    {id:'kindness',icon:'🤝',title:'溫暖分享日',detail:'送給每位其他冒險家最多 $10。',effect:'give-all',amount:10},
+    {id:'formula-challenge',icon:'📚',title:'幾何特訓獎',detail:'答對圓周長題得 $110，答錯不扣錢。',effect:'quiz',quizKind:'calc',success:110,fail:0},
+    {id:'rainbow-treasure',icon:'🌈',title:'彩虹寶藏',detail:'找到稀有彩虹寶箱，獲得 $140。',effect:'gain',amount:140}
   ],
   fate:[
     {id:'pickpocket',icon:'🥷',title:'小偷來襲',detail:'隨機一人取走你最多 $50。',effect:'lose-to',amount:50},
@@ -72,7 +78,13 @@ const CARD_DECKS=Object.freeze({
     {id:'quiz',icon:'🔮',title:'命運幾何考驗',detail:'答對得 $90，未答對付 $50。',effect:'quiz',success:90,fail:-50},
     {id:'lost-map',icon:'🗺️',title:'地圖不見了',detail:'補買地圖花 $25。',effect:'lose',amount:25},
     {id:'chest',icon:'💎',title:'地下寶箱',detail:'發現藏寶，立刻獲得 $75！',effect:'gain',amount:75},
-    {id:'rescue',icon:'🛟',title:'幾何救援',detail:'答對得 $65，未答對付 $25。',effect:'quiz',quizKind:'rescue',success:65,fail:-25}
+    {id:'rescue',icon:'🛟',title:'幾何救援',detail:'答對得 $65，未答對付 $25。',effect:'quiz',quizKind:'rescue',success:65,fail:-25},
+    {id:'rainstorm',icon:'🌧️',title:'暴雨修理費',detail:'店面招牌被吹歪，付 $60 維修。',effect:'lose',amount:60},
+    {id:'neighbors',icon:'🎂',title:'生日小禮物',detail:'每位其他玩家送你最多 $10 祝福金。',effect:'collect-all',amount:10},
+    {id:'donation',icon:'🎗️',title:'公益捐款',detail:'捐出每位其他玩家最多 $20 的零用錢。',effect:'give-all',amount:20},
+    {id:'missed-train',icon:'🚉',title:'錯過冒險列車',detail:'下一回合暫停行動一次。',effect:'skip-turn'},
+    {id:'geometry-rescue',icon:'🧠',title:'圖形迷宮',detail:'答對複合圖形題得 $105，答錯付 $40。',effect:'quiz',quizKind:'boss',success:105,fail:-40},
+    {id:'safety-net',icon:'🧥',title:'守護護身符',detail:'本回合獲得一張租金保護券。',effect:'rent-shield'}
   ]
 });
 const shuffle = (array) => {
@@ -157,7 +169,7 @@ class GameManager {
   makePlayer(name, animal, host=false, isBot=false) {
     return { id:randomUUID(), token:isBot?null:randomBytes(24).toString('hex'), name, animal,
       host, isBot, connected:true, socketId:null, cash:0, properties:[], position:0,
-      jailed:false,bailPurchaseBan:false,bankrupt:false,
+      jailed:false,bailPurchaseBan:false,bankrupt:false,rentShield:0,
       missedTurns:0, correct:0, attempted:0, answerHistory:[],reflection:null,
        achievements:[],titleId:null,spectatorCorrect:0,spectatorAttempted:0 };
   }
@@ -321,7 +333,7 @@ class GameManager {
     room.properties={}; room.pending=null; room.lastRoll=null; room.lastResult=null;
     room.questionQueues={};room.lastQuestionIds={};room.rankings=[];room.botAction=null;room.betweenExpiresAt=null;
     room.jailChoiceExpiresAt=null;room.lastCard=null;room.finishReason=null;room.bankruptPlayerId=null;
-    room.players.forEach(p=>{p.cash=money;p.properties=[];p.position=0;p.correct=0;p.attempted=0;p.answerHistory=[];p.reflection=null;p.missedTurns=0;p.jailed=false;p.bailPurchaseBan=false;p.bankrupt=false;p.achievements=[];p.titleId=null;p.spectatorCorrect=0;p.spectatorAttempted=0;});
+    room.players.forEach(p=>{p.cash=money;p.properties=[];p.position=0;p.correct=0;p.attempted=0;p.answerHistory=[];p.reflection=null;p.missedTurns=0;p.jailed=false;p.bailPurchaseBan=false;p.bankrupt=false;p.rentShield=0;p.achievements=[];p.titleId=null;p.spectatorCorrect=0;p.spectatorAttempted=0;});
     message(room, `🎉 遊戲開始！每人獲得 $${money}，每題 ${questionSeconds} 秒，${unlimited?'無輪數上限':'最多 '+limit+' 輪'}，${durationMinutes} 分鐘後結算（房主也可提前結束）。${room.players[0].name} 先擲骰。`);
   }
 
@@ -484,6 +496,11 @@ class GameManager {
       }
       const owner=room.players.find(p=>p.id===ownerId);
       if (!owner) { delete room.properties[tile.id];this.beginBetween(room);return; }
+      if(player.rentShield>0){
+        player.rentShield--;
+        message(room,'🛡️ '+player.name+' 使用租金保護券，經過「'+tile.name+'」免付過路費且不觸發加賽！');
+        this.beginBetween(room);return;
+      }
       if (player.cash>=tile.rent) {
         changeCash(player,-tile.rent);changeCash(owner,tile.rent);
         message(room, `🏠 ${player.name} 支付 $${tile.rent} 過路費給屋主 ${owner.name}。`);
@@ -671,7 +688,8 @@ class GameManager {
     const player=requireTurn(room,playerId);
     if(room.phase!=='card-draw'||room.pending?.type!=='card-draw')throw new GameError('目前沒有可抽取的卡牌。');
     const {kind,tileId}=room.pending;
-    const card=CARD_DECKS[kind][Math.floor(Math.random()*CARD_DECKS[kind].length)];
+    const deck=CARD_DECKS[kind];
+    const card=deck[Math.floor(Math.random()*deck.length)];
     const record={id:randomUUID(),kind,tileId,icon:card.icon,title:card.title,detail:card.detail,effect:card.effect,playerId,at:Date.now()};
     room.lastCard=record;room.pending=null;
     this.unlockAchievement(room,player,'story_brave');
@@ -680,7 +698,7 @@ class GameManager {
       this.ask(room,card.quizKind||kind,{card:{title:card.title,detail:card.detail,success:card.success,fail:card.fail}},{label:card.title});
       return record;
     }
-    let amount=0;let target=null;
+    let amount=0,target=null;
     if(card.effect==='steal'||card.effect==='lose-to'){
       const others=room.players.filter(p=>p.id!==player.id&&p.cash>0);
       if(others.length){
@@ -690,12 +708,33 @@ class GameManager {
         amount=-changeCash(payer,-Math.min(card.amount,payer.cash));
         changeCash(receiver,amount);
       }
+    }else if(card.effect==='collect-all'){
+      for(const other of room.players){
+        if(other.id===player.id)continue;
+        const paid=-changeCash(other,-Math.min(card.amount,other.cash));
+        changeCash(player,paid);amount+=paid;
+      }
+    }else if(card.effect==='give-all'){
+      for(const other of room.players){
+        if(other.id===player.id)continue;
+        const paid=-changeCash(player,-Math.min(card.amount,player.cash));
+        changeCash(other,paid);amount+=paid;
+      }
+    }else if(card.effect==='rent-shield'){
+      player.rentShield=1;
+    }else if(card.effect==='skip-turn'){
+      player.missedTurns=Math.min(2,player.missedTurns+1);
     }else if(card.effect==='gain')amount=changeCash(player,card.amount);
     else amount=-changeCash(player,-card.amount);
     record.amount=amount;record.targetName=target?.name||null;
     if(card.effect==='steal')record.outcome=target?'從 '+target.name+' 取得 $'+amount:'目前無可轉移的金錢';
     else if(card.effect==='lose-to')record.outcome=target?'支付 '+target.name+' $'+amount:'目前無接收對象';
-    else record.outcome=card.effect==='gain'?'獲得 $'+amount:'支出 $'+amount;
+    else if(card.effect==='gain')record.outcome='獲得 $'+amount;
+    else if(card.effect==='lose')record.outcome='支出 $'+amount;
+    else if(card.effect==='collect-all')record.outcome='其他玩家共同送出 $'+amount;
+    else if(card.effect==='give-all')record.outcome='分送其他玩家共 $'+amount;
+    else if(card.effect==='rent-shield')record.outcome='獲得一次免付租金保護券';
+    else if(card.effect==='skip-turn')record.outcome='下次輪到時暫停一回合';
     message(room,'🃏 '+player.name+' 抽到「'+card.title+'」：'+record.outcome);
     this.beginBetween(room);return record;
   }
@@ -871,7 +910,7 @@ class GameManager {
     room.status='lobby';room.phase='lobby';room.currentPlayerId=null;
     room.round=1;room.rankings=[];room.pending=null;room.properties={};room.botAction=null;room.betweenExpiresAt=null;room.jailChoiceExpiresAt=null;room.lastCard=null;room.finishReason=null;room.bankruptPlayerId=null;room.lastQuestionIds={};
     room.lastRoll=null;room.lastResult=null;room.duel=null;room.lastDuel=null;room.endsAt=null;room.bonusStage=0;room.questionQueues={};room.poll=null;room.lastPoll=null;room.lastAchievement=null;
-    room.players.forEach(p=>{p.cash=0;p.properties=[];p.position=0;p.missedTurns=0;p.correct=0;p.attempted=0;p.answerHistory=[];p.reflection=null;p.achievements=[];p.titleId=null;p.jailed=false;p.bailPurchaseBan=false;p.bankrupt=false;p.spectatorCorrect=0;p.spectatorAttempted=0;});
+    room.players.forEach(p=>{p.cash=0;p.properties=[];p.position=0;p.missedTurns=0;p.correct=0;p.attempted=0;p.answerHistory=[];p.reflection=null;p.achievements=[];p.titleId=null;p.jailed=false;p.bailPurchaseBan=false;p.bankrupt=false;p.rentShield=0;p.spectatorCorrect=0;p.spectatorAttempted=0;});
     message(room,'🔁 房主已開啟下一局，所有玩家保留座位。');
   }
 
@@ -889,7 +928,7 @@ class GameManager {
       bankruptPlayerId:room.bankruptPlayerId||null,
       players:room.players.map(p=>({id:p.id,name:p.name,animal:p.animal,host:p.host,isBot:!!p.isBot,
         connected:p.connected,cash:p.cash,properties:p.properties,position:p.position,
-        missedTurns:p.missedTurns,jailed:!!p.jailed,bailPurchaseBan:!!p.bailPurchaseBan,bankrupt:!!p.bankrupt,correct:p.correct,attempted:p.attempted,
+        missedTurns:p.missedTurns,jailed:!!p.jailed,bailPurchaseBan:!!p.bailPurchaseBan,bankrupt:!!p.bankrupt,rentShield:p.rentShield||0,correct:p.correct,attempted:p.attempted,
         achievements:[...p.achievements],titleId:p.titleId})),
       achievementCatalog:ACHIEVEMENTS,lastAchievement:room.lastAchievement,
       mySpectatorScore:(()=>{const mine=room.players.find(p=>p.id===viewerId);return mine?{correct:mine.spectatorCorrect,attempted:mine.spectatorAttempted}:null;})(),

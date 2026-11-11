@@ -795,3 +795,143 @@
 .circle-diagram .math-value{font-size:11px}
 .option-btn{font-variant-numeric:tabular-nums}
 @media(prefers-reduced-motion:reduce){.draw-card-back{animation:none}}
+
+/* v2.2.0：課堂私人計算紙、全員看得到的地圖翻牌、動物集合動畫 */
+.scratchpad-modal{
+  position:fixed;inset:0;z-index:180;overflow:auto;padding:clamp(10px,3vw,28px);
+  background:rgba(25,40,58,.69);display:flex;justify-content:center;align-items:flex-start;
+}
+.scratchpad-modal[hidden]{display:none!important}
+.scratchpad-dialog{width:min(1090px,100%);margin:auto 0;max-width:100%;padding:clamp(14px,2.4vw,26px);box-sizing:border-box;
+  border:2px solid #c5dfd7;box-shadow:0 16px 65px #101f345e}
+.scratchpad-header{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:15px}
+.scratchpad-header h2{margin:3px 0 6px;font-size:clamp(21px,3vw,29px)}
+.scratchpad-header p{font-size:12px;color:#63798a;line-height:1.55}
+.scratchpad-header button{flex:none;min-height:42px}
+.scratchpad-question-box{padding:13px 17px;border:1px solid #c6ded9;border-radius:14px;background:#eff9f5;
+  color:#264657;line-height:1.65;max-height:220px;overflow:auto}
+.scratchpad-question-box>strong{font-size:12px;letter-spacing:.5px}
+#scratchpad-question{font-size:clamp(15px,1.65vw,19px);font-weight:760;margin:7px 0}
+.scratchpad-diagram:empty{display:none}
+.scratchpad-diagram .circle-diagram{max-width:340px;margin:2px auto 5px;padding:3px}
+.scratchpad-diagram .circle-diagram svg{max-height:110px;width:min(100%,230px)}
+.scratchpad-diagram .circle-diagram figcaption{font-size:10px}
+.scratchpad-layout{display:grid;grid-template-columns:minmax(0,1fr) 266px;gap:16px;margin-top:16px}
+.scratchpad-paper-area{min-width:0}
+.scratchpad-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-bottom:9px}
+.scratchpad-toolbar button{min-height:36px}
+.scratchpad-toolbar [data-pad-tool].is-selected{border:2px solid #2a8a8d;background:#e2f5f0;color:#226e70}
+.scratchpad-color{width:34px;height:34px;border-radius:50%;border:3px solid #fff;outline:1px solid #bfc9cb;
+ background:var(--ink-color);cursor:pointer;box-shadow:0 2px 5px #26384621}
+.scratchpad-color[aria-pressed="true"]{outline:3px solid #d9a542;outline-offset:1px}
+.scratchpad-canvas{display:block;width:100%;height:380px;background:white;
+  border:2px solid #b2c9cc;border-radius:12px;box-sizing:border-box;cursor:crosshair;
+  touch-action:none;user-select:none;-webkit-user-select:none}
+.scratchpad-hint{font-size:11px;color:#607582;line-height:1.6;margin-top:9px}
+.scratchpad-calc-area{padding:13px;background:#edf4fa;border:1px solid #c1d5e2;border-radius:14px;align-self:start}
+.scratchpad-calc-area h3{font-size:15px;margin:0 0 11px;color:#28465e}
+.scratchpad-calc-display{display:block;min-height:54px;padding:12px 10px;margin-bottom:9px;
+  border-radius:9px;background:#fdfefd;border:1px solid #c0d0d9;text-align:right;
+  font:800 24px/1.25 ui-monospace,SFMono-Regular,Consolas,monospace;color:#233a53;overflow-wrap:anywhere}
+.scratchpad-calculator{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.scratchpad-calc-key{min-height:47px;border:1px solid #c5d5dc;border-radius:9px;background:white;
+  color:#2f465b;font-size:18px;font-weight:800;cursor:pointer;touch-action:manipulation}
+.scratchpad-calc-key:hover{background:#e5f3ef}
+.scratchpad-calc-key:active{transform:scale(.96)}
+.scratchpad-calc-key.is-operator{background:#e0eaf9;color:#345a8a}
+.scratchpad-calc-key.is-equal{background:#2c8a79;color:white}
+.scratchpad-calc-area>p{font-size:11px;color:#627888;line-height:1.65;margin-top:10px}
+
+/* 地圖上的卡片：僅卡片本身有底色，不對整張棋盤加上覆蓋色塊。 */
+.board-wrapper{position:relative}
+.map-card-reveal{position:absolute;inset:0;z-index:45;display:flex;align-items:center;justify-content:center;
+  pointer-events:none;overflow:hidden}
+.map-card-reveal[hidden]{display:none!important}
+.map-card-flip{width:min(320px,77%);max-height:88%;perspective:1000px;filter:drop-shadow(0 11px 22px #1f2c4655)}
+.map-card-inner{width:100%;height:280px;position:relative;transform-style:preserve-3d;
+  animation:map-card-turn 4s cubic-bezier(.22,.8,.3,1) both}
+.map-card-face{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;gap:8px;border:5px solid #fff9dc;border-radius:19px;backface-visibility:hidden;overflow:hidden;
+  box-shadow:inset 0 0 0 2px #d5c5a5;padding:15px;box-sizing:border-box}
+.map-card-back{background:repeating-linear-gradient(45deg,#5b6fb0,#5b6fb0 10px,#6c85c5 10px,#6c85c5 20px);color:white}
+.map-card-back .map-card-icon{font-size:65px;filter:drop-shadow(0 3px 3px #19294777)}
+.map-card-back strong{font-size:22px}
+.map-card-front{transform:rotateY(180deg);background:#fffaf0;color:#2d4655}
+.map-card-reveal.kind-chance .map-card-front{border-color:#eac86a}
+.map-card-reveal.kind-fate .map-card-front{border-color:#bfa7e8}
+.map-card-front .map-card-kind{font-size:12px;font-weight:900;letter-spacing:2px;color:#7e6a7b}
+.map-card-front .map-card-icon{font-size:48px;line-height:1}
+.map-card-front h3{margin:0;font-size:clamp(17px,2.2vw,24px);line-height:1.25}
+.map-card-front p{margin:0;font-size:clamp(12px,1.35vw,15px);font-weight:720;line-height:1.5}
+.map-card-front .map-card-result{margin-top:3px;padding:5px 9px;font-size:13px;font-weight:850;
+  color:#28695e;background:#e3f5e9;border-radius:8px}
+@keyframes map-card-turn{0%,13%{transform:translateY(8px) rotateY(0deg) scale(.82)}
+  34%,85%{transform:translateY(-3px) rotateY(180deg) scale(1)}
+  100%{transform:translateY(-2px) rotateY(180deg) scale(.96)}}
+
+/* 等待室：十二種動物均出現，各有自己的循環動作，玩家加入也不重啟動畫 */
+.lobby-animal-parade{margin:14px 0 18px;padding:16px;border-radius:18px;border:1px solid #bfdcd6;
+  background:linear-gradient(120deg,#f2fbf6,#f3f6ff)}
+.animal-parade-title{display:flex;gap:6px 12px;align-items:baseline;flex-wrap:wrap;margin-bottom:14px}
+.animal-parade-title strong{font-size:17px;color:#286458}
+.animal-parade-title span{font-size:11px;color:#66807d}
+.lobby-animal-showcase{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+.showcase-animal{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  min-width:0;min-height:112px;padding:9px 4px 7px;border:1px solid #d0e3dc;border-radius:15px;
+  background:linear-gradient(155deg,white,var(--player-light,#e1f3ed));box-sizing:border-box}
+.showcase-animal .showcase-figure{display:grid;place-items:center;height:63px;width:70px;
+  font-size:45px;transform-origin:50% 83%;filter:drop-shadow(0 3px 2px #27434425);
+  animation-delay:var(--animal-delay,0s);animation-iteration-count:infinite}
+.showcase-animal .showcase-figure .animal-img{width:55px;height:55px;object-fit:contain}
+.showcase-name{font-size:12px;font-weight:850;color:#3d5d61;white-space:nowrap}
+.showcase-status{font-size:10px;color:#91a4a6;min-height:12px}
+.showcase-animal.is-taken{border-color:var(--player-color,#299982);box-shadow:inset 0 0 0 1px var(--player-color,#299982)}
+.showcase-animal.is-taken .showcase-status{color:#26746b;font-weight:800}
+.showcase-animal.motion-0 .showcase-figure{animation:capybara-gentle 3.2s ease-in-out infinite}
+.showcase-animal.motion-1 .showcase-figure{animation:cat-pounce 2.7s ease-in-out infinite}
+.showcase-animal.motion-2 .showcase-figure{animation:dog-wag 1.5s ease-in-out infinite}
+.showcase-animal.motion-3 .showcase-figure{animation:rabbit-hop 2.2s ease-in-out infinite}
+.showcase-animal.motion-4 .showcase-figure{animation:fox-peek 3s ease-in-out infinite}
+.showcase-animal.motion-5 .showcase-figure{animation:panda-roll 3.6s ease-in-out infinite}
+.showcase-animal.motion-6 .showcase-figure{animation:frog-leap 2.4s ease-in-out infinite}
+.showcase-animal.motion-7 .showcase-figure{animation:penguin-waddle 2s ease-in-out infinite}
+.showcase-animal.motion-8 .showcase-figure{animation:lion-roar 2.8s ease-in-out infinite}
+.showcase-animal.motion-9 .showcase-figure{animation:turtle-step 4.1s ease-in-out infinite}
+.showcase-animal.motion-10 .showcase-figure{animation:hamster-bounce 1.3s ease-in-out infinite}
+.showcase-animal.motion-11 .showcase-figure{animation:owl-tilt 3.3s ease-in-out infinite}
+@keyframes capybara-gentle{0%,100%{transform:translateY(1px) rotate(-3deg)}50%{transform:translateY(-5px) rotate(3deg)}}
+@keyframes cat-pounce{0%,60%,100%{transform:translateY(0)}27%{transform:translateY(-15px) rotate(-7deg)}43%{transform:translateY(-4px) rotate(5deg)}}
+@keyframes dog-wag{0%,100%{transform:rotate(-7deg)}25%,75%{transform:rotate(7deg)}}
+@keyframes rabbit-hop{0%,35%,80%,100%{transform:translateY(0)}16%{transform:translateY(-19px)}54%{transform:translateY(-11px)}}
+@keyframes fox-peek{0%,100%{transform:translateX(-6px) rotate(-9deg)}50%{transform:translateX(6px) rotate(10deg)}}
+@keyframes panda-roll{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(9deg) scale(1.04)}}
+@keyframes frog-leap{0%,46%,100%{transform:translateY(0) scale(1.06,.95)}24%{transform:translateY(-17px) scale(.94,1.08)}}
+@keyframes penguin-waddle{0%,100%{transform:translateX(-4px) rotate(-9deg)}50%{transform:translateX(4px) rotate(9deg)}}
+@keyframes lion-roar{0%,75%,100%{transform:scale(1)}30%{transform:scale(1.18) rotate(-4deg)}49%{transform:scale(1.05) rotate(4deg)}}
+@keyframes turtle-step{0%,100%{transform:translateX(-7px)}50%{transform:translateX(7px) rotate(3deg)}}
+@keyframes hamster-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px) scale(1.07)}}
+@keyframes owl-tilt{0%,100%{transform:rotate(-13deg)}35%{transform:rotate(12deg)}65%{transform:rotate(0) translateY(-7px)}}
+@media(max-width:900px){.lobby-animal-showcase{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:760px){.scratchpad-layout{grid-template-columns:1fr}
+  .scratchpad-canvas{height:340px}.scratchpad-calc-area{max-width:420px;width:100%;box-sizing:border-box;margin:auto}
+  .scratchpad-question-box{max-height:180px}}
+@media(max-width:480px){.lobby-animal-showcase{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+  .showcase-animal{min-height:98px}.showcase-animal .showcase-figure{height:53px}
+  .showcase-animal .showcase-figure .animal-img{width:48px;height:48px}
+  .showcase-animal .showcase-figure{font-size:40px}
+  .scratchpad-dialog{padding:12px}.scratchpad-canvas{height:310px}
+  .scratchpad-modal{padding:6px}
+  .map-card-inner{height:238px}.map-card-front .map-card-icon{font-size:39px}
+  .scratchpad-calc-key{min-height:43px}}
+@media(prefers-reduced-motion:reduce){
+  .showcase-animal .showcase-figure{animation:none!important}
+  .map-card-inner{animation:none;transform:rotateY(180deg)}
+}
+
+/* 問題面板的計算紙入口不搶走答題按鈕的焦點 */
+.scratchpad-launch{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:12px 0}
+.scratchpad-launch .btn{border-color:#8fbfb4;background:#edf9f3;color:#256b60;font-weight:850;min-height:42px}
+.scratchpad-launch small{font-size:11px;color:#718681}
+.lobby-animal-showcase .showcase-animal .showcase-figure{animation-delay:var(--animal-delay,0s)}
+@media(max-width:480px){.scratchpad-launch{flex-direction:column;align-items:stretch}
+  .scratchpad-launch small{text-align:center}}

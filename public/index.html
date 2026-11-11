@@ -6,12 +6,13 @@
   <meta name="theme-color" content="#f6efe5" />
   <meta name="description" content="六年級圓周長與圓面積大富翁：5 位學生與房主同時連線，使用圓周率 3.14 練習圓的半徑、直徑、周長、面積與生活應用。" />
   <title>圓形富翁探險島｜六年級圓周長與圓面積大富翁</title>
-  <link rel="stylesheet" href="/style.css?v=2.1.0" />
+  <link rel="stylesheet" href="/style.css?v=2.2.0" />
   <script src="/socket.io/socket.io.js" defer></script>
-  <script src="/board-layout.js?v=2.1.0" defer></script>
-  <script src="/player-colors.js?v=2.1.0" defer></script>
-  <script src="/sound.js?v=2.1.0" defer></script>
-  <script src="/app.js?v=2.1.0" defer></script>
+  <script src="/board-layout.js?v=2.2.0" defer></script>
+  <script src="/player-colors.js?v=2.2.0" defer></script>
+  <script src="/sound.js?v=2.2.0" defer></script>
+  <script src="/scratchpad.js?v=2.2.0" defer></script>
+  <script src="/app.js?v=2.2.0" defer></script>
 </head>
 <body>
 <div class="app">
@@ -62,6 +63,10 @@
     <div id="update-banner" class="update-banner" hidden><span id="update-banner-info">遊戲有新版可用。</span><button id="update-now" class="btn outline small" type="button">🔄 重新整理以更新</button></div>
     <section id="lobby-screen" class="lobby-screen panel" hidden>
       <div class="lobby-head"><div><span class="overline">等大家到齊！</span><h2>冒險家集合！</h2><p>把房間代碼分享給同學，每人選一隻自己的動物。</p></div><div class="lobby-header-actions"><div class="lobby-code" id="lobby-big-code">------</div><button id="leave-btn" type="button" class="btn lobby-leave-btn">🚪 離開此房間</button></div></div>
+      <section class="lobby-animal-parade" aria-label="十二種冒險動物正在集合">
+        <div class="animal-parade-title"><strong>🐾 冒險島動物派對</strong><span>12 種動物各自有不同的歡迎動作</span></div>
+        <div id="lobby-animal-showcase" class="lobby-animal-showcase"></div>
+      </section>
       <div id="lobby-slots" class="lobby-slots"></div>
       <section class="lobby-settings-preview" aria-label="房主本局設定"><div class="settings-preview-head"><h3>📋 本局遊戲設定</h3><span id="settings-sync-label">房主選擇後會同步更新</span></div><div id="lobby-settings-summary" class="settings-summary-grid" aria-live="polite"></div></section>
       <div id="host-settings" class="host-settings" hidden>
@@ -81,7 +86,9 @@
       <div class="play-grid">
         <section class="board-column">
           <div class="section-head"><div><span class="overline">CIRCLE ISLAND</span><h2>圓形富翁地圖</h2></div><div class="game-clock-group"><div id="round-chip" class="round-chip">第 1 輪 · ♾️ 無限輪</div><div id="session-clock" class="session-clock">⏱️ 30:00</div></div></div>
-          <div class="track-tools"><span class="track-instruction">🎲 32 格經典方格棋盤 · 依裝置自動適配起始比例，換人不強制放大；可自行縮放、拖曳或滑動</span><div class="track-zoom" aria-label="棋盤視野控制"><button type="button" class="btn outline small" id="map-overview">全覽</button><button type="button" class="btn outline small" id="map-zoom-out" aria-label="縮小棋盤">−</button><span id="map-zoom-label" class="map-zoom-label" aria-live="polite">100%</span><button type="button" class="btn outline small" id="map-zoom-in" aria-label="放大棋盤">＋</button><button type="button" class="btn outline small" id="map-fullsize">🎯 聚焦目前玩家</button></div></div><div id="board-wrapper" class="board-wrapper" aria-label="棋盤可用滑動或拖曳調整位置"><div id="board" class="board" aria-label="大富翁遊戲棋盤"><div id="board-center" class="board-center"></div></div></div>
+          <div class="track-tools"><span class="track-instruction">🎲 32 格經典方格棋盤 · 依裝置自動適配起始比例，換人不強制放大；可自行縮放、拖曳或滑動</span><div class="track-zoom" aria-label="棋盤視野控制"><button type="button" class="btn outline small" id="map-overview">全覽</button><button type="button" class="btn outline small" id="map-zoom-out" aria-label="縮小棋盤">−</button><span id="map-zoom-label" class="map-zoom-label" aria-live="polite">100%</span><button type="button" class="btn outline small" id="map-zoom-in" aria-label="放大棋盤">＋</button><button type="button" class="btn outline small" id="map-fullsize">🎯 聚焦目前玩家</button></div></div><div id="board-wrapper" class="board-wrapper" aria-label="棋盤可用滑動或拖曳調整位置"><div id="board" class="board" aria-label="大富翁遊戲棋盤"><div id="board-center" class="board-center"></div></div>
+            <div id="map-card-reveal" class="map-card-reveal" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+          </div>
           <div class="board-legend"><span><b class="legend-square prop"></b>可購買店面</span><span><b class="legend-square event"></b>答題事件</span><span>🏁 經過起點 +$200</span><span>⚔️ 別人的房產：繳租後雙人加賽</span><span>🚔 監獄：服刑一回合／保釋 $80</span><span>🤝 均付：支付 $120 給其他玩家</span></div>
           <section class="panel history-panel"><h3>📣 冒險紀錄 <small>最新事件置頂</small></h3><div id="history" class="history" aria-live="polite"></div></section>
         </section>
@@ -108,6 +115,42 @@
       <button id="restart-btn" class="btn primary" hidden>🔄 原班人馬，再玩一局</button>
     </section>
   </main>
+  <section id="scratchpad-modal" class="scratchpad-modal" role="dialog" aria-modal="true"
+    aria-labelledby="scratchpad-title" hidden>
+    <div class="scratchpad-dialog panel">
+      <header class="scratchpad-header">
+        <div><div class="overline">MY MATH NOTEBOOK</div><h2 id="scratchpad-title">✏️ 我的計算紙</h2>
+          <p>自己的草稿紙，不會傳給其他同學；關閉後再打開，這題的筆跡還在。</p></div>
+        <button id="scratchpad-close" type="button" class="btn outline" aria-label="關閉計算紙">✕ 關閉</button>
+      </header>
+      <div class="scratchpad-question-box" aria-label="目前的題目">
+        <strong>📖 目前題目</strong><p id="scratchpad-question"></p>
+        <div id="scratchpad-diagram" class="scratchpad-diagram"></div>
+      </div>
+      <div class="scratchpad-layout">
+        <section class="scratchpad-paper-area" aria-label="手寫計算區">
+          <div class="scratchpad-toolbar" role="toolbar" aria-label="畫筆工具">
+            <button type="button" data-pad-tool="pen" class="btn outline small" aria-pressed="true">✏️ 畫筆</button>
+            <button type="button" data-pad-tool="erase" class="btn outline small" aria-pressed="false">🧽 橡皮擦</button>
+            <button type="button" data-pad-color="#265b82" class="scratchpad-color" style="--ink-color:#265b82" aria-label="藍色畫筆" aria-pressed="true"></button>
+            <button type="button" data-pad-color="#d7594e" class="scratchpad-color" style="--ink-color:#d7594e" aria-label="紅色畫筆" aria-pressed="false"></button>
+            <button type="button" data-pad-color="#242c37" class="scratchpad-color" style="--ink-color:#242c37" aria-label="黑色畫筆" aria-pressed="false"></button>
+            <button id="scratchpad-undo" type="button" class="btn outline small">↶ 復原</button>
+            <button id="scratchpad-clear" type="button" class="btn outline small">清空</button>
+          </div>
+          <canvas id="scratchpad-canvas" class="scratchpad-canvas"
+            aria-label="空白計算紙，可用滑鼠、手指或觸控筆寫下計算過程"></canvas>
+          <p class="scratchpad-hint">可用滑鼠、手指或觸控筆書寫；橡皮擦、復原與清空只影響自己的草稿。</p>
+        </section>
+        <section class="scratchpad-calc-area" aria-label="簡易四則運算計算機">
+          <h3>🧮 小計算機</h3>
+          <output id="scratchpad-calc-display" class="scratchpad-calc-display" aria-live="polite">0</output>
+          <div id="scratchpad-calculator" class="scratchpad-calculator"></div>
+          <p>π 固定為 3.14；計算機只輔助練習，不會直接替你選答案。</p>
+        </section>
+      </div>
+    </div>
+  </section>
   <section id="feedback-history-modal" class="history-modal" role="dialog" aria-modal="true" aria-labelledby="feedback-history-title" hidden>
     <div class="history-dialog panel">
       <div class="history-dialog-head">

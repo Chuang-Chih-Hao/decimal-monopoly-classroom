@@ -1,7 +1,7 @@
 /* 圓形富翁前端：所有資產、擲骰、判分都以伺服器狀態為準。 */
 (() => {
   'use strict';
-  const CLIENT_VERSION='2.1.0';
+  const CLIENT_VERSION='2.2.0';
   const socket=io({transports:['websocket','polling'],reconnection:true});
   const sound=window.DecimalMonopolyAudio;
   const playSound=(kind,detail)=>sound?.play(kind,detail);
@@ -70,6 +70,9 @@
   let activeRollAnimation=null;
   let animationNonce=0;
   let deferredFeedback=null;
+  let seenCardId=null;
+  let queuedCardReveal=null;
+  let cardRevealTimer=null;
   let seenDuelResultId=null;
   let reflectionDirty=false;
   const tileEffectTimers=new Map();
@@ -239,6 +242,9 @@
   }
   function clearSession(){
     animationNonce++;activeRollAnimation=null;deferredFeedback=null;
+    seenCardId=null;queuedCardReveal=null;clearTimeout(cardRevealTimer);
+    if($('map-card-reveal'))$('map-card-reveal').hidden=true;
+    window.CircleScratchpad?.sync(null);
     seenRollId=null;seenLogId=null;seenDuelResultId=null;seenAchievementId=null;mapFocusKey=null;mapZoom=1;mapZoomInitialized=false;mapZoomManual=false;reflectionDirty=false;
     $('event-spotlight').hidden=true;
     tokenData=null;me=null;state=null;
@@ -248,6 +254,9 @@
   // 首次加入／重新連線時，以伺服器畫面為準，不重播已經結束的擲骰。
   function setInitialState(next){
     animationNonce++;activeRollAnimation=null;deferredFeedback=null;
+    seenCardId=next.lastCard?.id||null;queuedCardReveal=null;clearTimeout(cardRevealTimer);
+    if($('map-card-reveal'))$('map-card-reveal').hidden=true;
+    window.CircleScratchpad?.sync(null);
     state=next;mapFocusKey=null;mapZoomInitialized=false;mapZoomManual=false;reflectionDirty=false;
     seenRollId=next.lastRoll?.id??null;
     seenDuelResultId=next.lastDuel?.id??null;
@@ -283,6 +292,59 @@
       :'📣 冒險事件';
     return {icon:positive?'🌟':'📣',title,detail:text,kind:positive?'success':'event'};
   }
+  // 與棋盤縮放互不干擾的全員翻牌演出；只渲染伺服器已公布的卡片資料。
+  function showMapCardReveal(card){
+    const view=$('map-card-reveal');
+    if(!view||!card||state?.status!=='playing')return;
+    clearTimeout(cardRevealTimer);
+    const chance=card.kind==='chance';
+    const type=chance?'機會卡':'命運卡';
+    const kindIcon=chance?'🍀':'🔮';
+    view.hidden=false;
+    view.className='map-card-reveal kind-'+(chance?'chance':'fate');
+    view.innerHTML=`<div class="map-card-flip"><div class="map-card-inner">
+      <div class="map-card-face map-card-back"><span class="map-card-icon">${kindIcon}</span><strong>${type}</strong><small>翻開看看！</small></div>
+      <div class="map-card-face map-card-front">
+        <div class="map-card-kind">${kindIcon} ${type}</div>
+        <div class="map-card-icon">${esc(card.icon||'🃏')}</div>
+        <h3>${esc(card.title)}</h3>
+        <p>${esc(card.detail)}</p>
+        ${card.outcome?'<div class="map-card-result">'+esc(card.outcome)+'</div>':''}
+      </div></div></div>`;
+    // 同張牌若下一次又抽到，以新 id 觸發相同動畫。
+    void view.offsetWidth;
+    playSound('card-flip',{kind:card.kind,effect:card.effect});
+    cardRevealTimer=setTimeout(()=>{if(view.classList.contains('map-card-reveal'))view.hidden=true;},4400);
+  }
+  function flushQueuedCardReveal(nonce){
+    if(!queuedCardReveal||state?.status!=='playing')return;
+    const card=queuedCardReveal;queuedCardReveal=null;
+    if(nonce!==undefined&&animationNonce!==nonce)return;
+    showMapCardReveal(card);
+  }
+  function renderLobbyAnimals(){
+    const container=$('lobby-animal-showcase');
+    if(!container)return;
+    if(!container.dataset.initialized){
+      container.innerHTML=animals.map((a,i)=>{
+        const colors=colorFor({animal:a});
+        return `<div class="showcase-animal motion-${i}" data-showcase-animal="${esc(a)}"
+            style="--player-color:${colors.hex};--player-light:${colors.light};--animal-delay:${-i*.19}s">
+          <span class="showcase-figure" aria-hidden="true">${animalHtml(a)}</span>
+          <strong class="showcase-name">${esc(animalNames[i])}</strong>
+          <small class="showcase-status">等待冒險家</small>
+        </div>`;
+      }).join('');
+      container.dataset.initialized='true';
+    }
+    const taken=new Set((state?.players||[]).map(p=>p.animal));
+    for(const card of container.querySelectorAll('[data-showcase-animal]')){
+      const active=taken.has(card.dataset.showcaseAnimal);
+      card.classList.toggle('is-taken',active);
+      card.querySelector('.showcase-status').textContent=active?'✓ 已入隊':'等待冒險家';
+    }
+  }
+
   function highlightNewEvents(previous,next){
     if(!previous||next.status!=='playing')return;
     if(next.lastDuel && next.lastDuel.id!==previous.lastDuel?.id && next.lastDuel.id!==seenDuelResultId){
@@ -295,12 +357,10 @@
       else showSpotlight(item.icon,item.title,item.detail,item.kind);
       return;
     }
-    if(next.lastCard?.id&&next.lastCard.id!==previous.lastCard?.id){
-      const card=next.lastCard;
-      const item={icon:card.icon||'🃏',title:(card.kind==='chance'?'🍀 機會卡':'🔮 命運卡')+'：'+card.title,
-        detail:card.outcome||card.detail,kind:card.effect==='lose'||card.effect==='lose-to'?'warning':'event'};
-      if(activeRollAnimation)deferredFeedback=item;
-      else showSpotlight(item.icon,item.title,item.detail,item.kind);
+    if(next.lastCard?.id&&next.lastCard.id!==seenCardId){
+      seenCardId=next.lastCard.id;
+      if(activeRollAnimation)queuedCardReveal=next.lastCard;
+      else showMapCardReveal(next.lastCard);
       return;
     }
     const result=next.lastResult;
@@ -600,10 +660,13 @@
     // 若房主在上一位角色移動動畫未播完就跳回合，立即停止舊動畫，避免鏡頭與新回合爭奪焦點。
     if(previous?.currentPlayerId!==next.currentPlayerId&&activeRollAnimation){
       animationNonce++;activeRollAnimation=null;deferredFeedback=null;
+      if(queuedCardReveal)setTimeout(()=>flushQueuedCardReveal(),0);
     }
     const isNewRoll=next.status==='playing'&&!!next.lastRoll?.id&&next.lastRoll.id!==seenRollId;
     if(next.status!=='playing'){
-      animationNonce++;activeRollAnimation=null;deferredFeedback=null;
+      animationNonce++;activeRollAnimation=null;deferredFeedback=null;queuedCardReveal=null;
+      clearTimeout(cardRevealTimer);if($('map-card-reveal'))$('map-card-reveal').hidden=true;
+      window.CircleScratchpad?.sync(null);
       if(!next.lastRoll)seenRollId=null;
     }
     if(isNewRoll){
@@ -669,6 +732,7 @@
       btn.disabled=true;
       request('removeBot',{botId:btn.dataset.removeBot},ok=>{if(!ok)renderLobby();});
     }));
+    renderLobbyAnimals();
     $('host-settings').hidden=!isHost();$('guest-waiting').hidden=isHost();
     const botCount=state.players.filter(p=>p.isBot).length;
     $('lobby-bot-count').textContent=`目前 ${botCount} 位機器人 · ${6-state.players.length} 個空位`;
@@ -827,6 +891,7 @@
     // 抵達後重新畫棋盤：動物會恢復成 v1.5 的小棋子圖示。
     activeRollAnimation=null;
     renderBoard();renderTurnActions();renderQuestion();renderDuel();syncQuestionPanelPosition();
+    if(queuedCardReveal)setTimeout(()=>flushQueuedCardReveal(nonce),reducedMotion?70:230);
     focusMapTile(roll.position);
     playLandingTileEffect(roll.position);
     if((state.log||[]).some(l=>l.at>=roll.at&&/支付.*過路費/.test(l.text))){
@@ -882,6 +947,8 @@
     if(!activeRollAnimation?.started)renderBoard();
     renderTurnActions();renderQuestion();renderDuel();renderResult();renderMyAssets();renderAchievements();renderScoreboard();renderLog();
     syncQuestionPanelPosition();
+    window.CircleScratchpad?.sync(state.phase==='answering'&&state.pending?.question?.id
+      ?state.code+':'+state.pending.type+':'+state.pending.question.id+':'+(state.pending.stage||1):null);
     $('teacher-panel').hidden=!isHost();
   }
   function renderTurnActions(){
@@ -1070,7 +1137,11 @@
     const spectatorNote=isMyTurn()?'選出正確答案；作答送出後不能更改。':hasGuessed?'✅ 你已送出觀戰猜題，答案保密，等待揭曉。':'👀 你也可以選一個答案參與觀戰猜題；不會扣款，也不計入正式答題分數。';
     const eventHeader=p.card?`<div class="event-card-head">🎴 ${esc(p.card.title)}<small>${esc(p.card.choiceLabel||'')}${p.card.detail?'｜'+esc(p.card.detail):''}</small></div>`:'';
     const nextRound=p.total>1?` · 第 ${p.stage} / ${p.total} 題`:'';
-    el.innerHTML=`<div class="question-tag">📝 ${esc(typeNames[p.type]||'數學挑戰')}${nextRound}</div>${eventHeader}<h3>${esc(p.question.text)}</h3>${renderCircleDiagram(p.question.diagram)}<div class="timer-bar"><div id="timer-fill" class="timer-fill"></div></div><div id="timer-label" class="question-hint"></div><div class="options">${opts.map((option,i)=>`<button class="option-btn${hasGuessed&&poll?.myChoice===i?' spectator-selected':''}" data-${turn?'choice':'spectator-choice'}="${i}" ${!turn&&!canGuess?'disabled':''}><span style="opacity:.55">${'ABCD'[i]}.</span> ${esc(option)}</button>`).join('')}</div><div class="question-hint">${spectatorNote}${poll?'｜已有 '+poll.submitted+' / '+poll.total+' 位觀戰者提交':''}</div>`;
+    el.innerHTML=`<div class="question-tag">📝 ${esc(typeNames[p.type]||'數學挑戰')}${nextRound}</div>${eventHeader}<h3>${esc(p.question.text)}</h3>${renderCircleDiagram(p.question.diagram)}<div class="scratchpad-launch"><button type="button" id="scratchpad-open" class="btn outline">✏️ 打開計算紙與計算機</button><small>可寫、可擦、可復原；只供自己使用</small></div><div class="timer-bar"><div id="timer-fill" class="timer-fill"></div></div><div id="timer-label" class="question-hint"></div><div class="options">${opts.map((option,i)=>`<button class="option-btn${hasGuessed&&poll?.myChoice===i?' spectator-selected':''}" data-${turn?'choice':'spectator-choice'}="${i}" ${!turn&&!canGuess?'disabled':''}><span style="opacity:.55">${'ABCD'[i]}.</span> ${esc(option)}</button>`).join('')}</div><div class="question-hint">${spectatorNote}${poll?'｜已有 '+poll.submitted+' / '+poll.total+' 位觀戰者提交':''}</div>`;
+    $('scratchpad-open')?.addEventListener('click',()=>window.CircleScratchpad?.open({
+      key:state.code+':'+p.type+':'+p.question.id+':'+(p.stage||1),
+      text:p.question.text,diagramHtml:renderCircleDiagram(p.question.diagram)
+    }));
     el.querySelectorAll('[data-choice]').forEach(b=>b.addEventListener('click',()=>{
       const index=Number(b.dataset.choice);
       el.querySelectorAll('[data-choice]').forEach(x=>x.disabled=true);

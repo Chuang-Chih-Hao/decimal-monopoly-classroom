@@ -109,6 +109,13 @@
           sequence([392,523,659,784,988],'triangle',.085,.29);break;
         case 'rent':
           tick(0,610,.25);sequence([480,390,335],'triangle',.08,.18);break;
+        case 'card-flip':
+          if(detail.effect==='lose'||detail.effect==='lose-to'||detail.effect==='skip-turn'){
+            sequence([580,425,300],'triangle',.115,.22);
+          }else if(detail.effect==='rent-shield'){
+            sequence([490,670,890,1080],'sine',.09,.24);
+          }else sequence([440,600,785,988],'triangle',.085,.23);
+          break;
         case 'story':sequence([415,554,370,622],'sine',.105,.20);break;
         case 'duel-start':tick(0,380,.24);tick(.15,450,.24);note(550,.30,.20,'triangle',.22);break;
         case 'duel-end':sequence([440,554,660],'triangle',.10,.24);break;

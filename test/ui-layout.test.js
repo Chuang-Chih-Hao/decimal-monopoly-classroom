@@ -718,3 +718,49 @@ test('v2.1.0 遊戲有實際抽牌動畫，機會與命運均含不同種類事�
   assert.ok(css.includes('.draw-card-back{'));
   assert.ok(css.includes('.card-summary{'));
 });
+
+test('v2.2.0 答題時可開啟個人計算紙，題目在上方，畫布和簡易計算機在下方',()=>{
+  const html=index;
+  const scratch=fs.readFileSync(path.join(__dirname,'../public/scratchpad.js'),'utf8');
+  const css=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
+  for(const id of ['scratchpad-modal','scratchpad-title','scratchpad-close','scratchpad-question',
+    'scratchpad-canvas','scratchpad-calculator','scratchpad-undo','scratchpad-clear','scratchpad-calc-display'])
+    assert.equal((html.match(new RegExp('id="'+id+'"','g'))||[]).length,1,id);
+  assert.ok(html.indexOf('scratchpad-question-box')<html.indexOf('scratchpad-canvas'));
+  assert.ok(html.includes('/scratchpad.js?v=2.2.0'));
+  assert.ok(app.includes('id="scratchpad-open"'));
+  assert.ok(app.includes('window.CircleScratchpad?.open'));
+  assert.ok(app.includes('window.CircleScratchpad?.sync'));
+  assert.ok(scratch.includes("addEventListener('pointerdown'"));
+  assert.ok(scratch.includes("addEventListener('pointermove'"));
+  assert.ok(scratch.includes("addEventListener('pointercancel'"));
+  assert.ok(scratch.includes("'destination-out'"));
+  assert.ok(scratch.includes('function repaint()'));
+  assert.ok(css.includes('touch-action:none'));
+  assert.ok(css.includes('grid-template-columns:1fr'));
+});
+test('v2.2.0 全房間同步的機會命運翻牌動畫必須顯示在地圖，結束再隱藏',()=>{
+  const css=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
+  assert.ok(index.includes('id="map-card-reveal"'));
+  assert.ok(app.includes('function showMapCardReveal(card)'));
+  assert.ok(app.includes('function flushQueuedCardReveal(nonce)'));
+  assert.ok(app.includes('seenCardId=next.lastCard?.id||null'));
+  assert.ok(app.includes('if(activeRollAnimation)queuedCardReveal=next.lastCard'));
+  assert.ok(app.includes('if(queuedCardReveal)setTimeout(()=>flushQueuedCardReveal(nonce)'));
+  assert.ok(app.includes("playSound('card-flip'"));
+  assert.ok(css.includes('.map-card-inner{'));
+  assert.ok(css.includes('@keyframes map-card-turn'));
+  assert.ok(css.includes('.map-card-reveal[hidden]'));
+});
+test('v2.2.0 大富翁等待室展示十二種不同動作的動物，並標示已入隊角色',()=>{
+  const css=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
+  assert.ok(index.includes('id="lobby-animal-showcase"'));
+  assert.ok(app.includes('function renderLobbyAnimals()'));
+  assert.ok(app.includes('renderLobbyAnimals();'));
+  assert.ok(app.includes('if(!container.dataset.initialized)'));
+  assert.ok(app.includes('animals.map((a,i)=>'));
+  assert.ok(app.includes("card.classList.toggle('is-taken',active)"));
+  for(let i=0;i<12;i++)assert.ok(css.includes('.showcase-animal.motion-'+i+' .showcase-figure'),'動物 '+i);
+  assert.ok(css.includes('@media(prefers-reduced-motion:reduce)'));
+  assert.ok(index.includes('動物派對'));
+});

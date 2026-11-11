@@ -1109,3 +1109,86 @@ test('v1.9.0 機器人監獄選擇可以自動進行，不會卡住真人回合'
   assert.equal(bot.cash,820);
   assert.equal(bot.bailPurchaseBan,true);
 });
+
+test('v2.2.0 兩組抽牌各 12 張，當局只有房內當回合玩家能抽',()=>{
+  const {game,room,host,student}=setup();
+  game.land(room,host,BOARD[4]);
+  assert.equal(room.phase,'card-draw');
+  assert.throws(()=>game.drawCard(room,student.id),GameError);
+  const before=room.pending;
+  const old=Math.random;Math.random=()=>0.999999;
+  try{
+    const card=game.drawCard(room,host.id);
+    assert.equal(card.title,'彩虹寶藏');
+    assert.equal(host.cash,1040);
+    assert.equal(card.effect,'gain');
+  }finally{Math.random=old;}
+  assert.notEqual(room.pending,before);
+  assert.equal(game.publicState(room,student.id).lastCard.title,'彩虹寶藏');
+  assert.equal(room.status,'playing');
+});
+test('v2.2.0 全員轉帳卡不憑空創造金錢，低現金時仍會破產結算',()=>{
+  const {game,room,host,student}=setup();
+  const random=Math.random;const original=host.cash+student.cash;
+  try{
+    Math.random=()=>7/12+.001; // 機會卡：園遊會人氣王
+    game.land(room,host,BOARD[4]);const gain=game.drawCard(room,host.id);
+    assert.equal(gain.effect,'collect-all');
+    assert.equal(host.cash,915);assert.equal(student.cash,885);
+    assert.equal(host.cash+student.cash,original);
+    game.nextTurn(room,host.id,true);
+    room.currentPlayerId=host.id;
+    Math.random=()=>9/12+.001; // 機會卡：溫暖分享日
+    game.land(room,host,BOARD[4]);const give=game.drawCard(room,host.id);
+    assert.equal(give.effect,'give-all');
+    assert.equal(host.cash,905);assert.equal(student.cash,895);
+    assert.equal(host.cash+student.cash,original);
+    game.nextTurn(room,host.id,true);
+    room.currentPlayerId=host.id;host.cash=10;host.bankrupt=false;
+    game.land(room,host,BOARD[8]);
+    Math.random=()=>8/12+.001; // 命運卡：公益捐款
+    const donation=game.drawCard(room,host.id);
+    assert.equal(donation.effect,'give-all');
+    assert.equal(donation.amount,10);
+    assert.equal(host.cash,0);
+    assert.equal(room.finishReason,'bankrupt');
+    assert.equal(room.status,'finished');
+  }finally{Math.random=random;}
+});
+test('v2.2.0 租金保護券僅免收一次過路費，不觸發剪刀石頭布',()=>{
+  const {game,room,host,student}=setup();
+  const original=Math.random;Math.random=()=>8/12+.001; // chance 租金保護券
+  try{
+    game.land(room,host,BOARD[4]);
+    const card=game.drawCard(room,host.id);
+    assert.equal(card.effect,'rent-shield');
+    assert.equal(host.rentShield,1);
+    assert.equal(game.publicState(room,host.id).players.find(p=>p.id===host.id).rentShield,1);
+    game.nextTurn(room,host.id,true);room.currentPlayerId=host.id;
+    room.properties[1]=student.id;student.properties.push(1);
+    const cash=host.cash;
+    game.land(room,host,BOARD[1]);
+    assert.equal(room.phase,'between');
+    assert.equal(room.duel,null);
+    assert.equal(host.cash,cash);
+    assert.equal(host.rentShield,0);
+    game.nextTurn(room,host.id,true);room.currentPlayerId=host.id;
+    game.land(room,host,BOARD[1]);
+    assert.ok(host.cash<cash,'再次踩到同一房產應正常收租');
+  }finally{Math.random=original;}
+});
+test('v2.2.0 特殊命運牌可能讓玩家下一回合暫停，且重開局狀態歸零',()=>{
+  const {game,room,host}=setup();
+  const old=Math.random;Math.random=()=>9/12+.001; // fate 錯過冒險列車
+  try{
+    game.land(room,host,BOARD[8]);
+    const card=game.drawCard(room,host.id);
+    assert.equal(card.effect,'skip-turn');
+    assert.equal(host.missedTurns,1);
+    game.finishByHost(room,host.id);
+    game.reset(room,host.id);
+    assert.equal(host.missedTurns,0);
+    assert.equal(host.rentShield,0);
+    assert.equal(room.lastCard,null);
+  }finally{Math.random=old;}
+});
