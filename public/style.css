@@ -935,3 +935,31 @@
 .lobby-animal-showcase .showcase-animal .showcase-figure{animation-delay:var(--animal-delay,0s)}
 @media(max-width:480px){.scratchpad-launch{flex-direction:column;align-items:stretch}
   .scratchpad-launch small{text-align:center}}
+
+/* v2.2.0 不同牌型有各自圖示動畫：寶箱、偷取、損失、護盾、幾何挑戰與分送 */
+.map-card-front .map-card-icon{display:block;transform-origin:center center}
+.map-card-reveal.effect-gain .map-card-front .map-card-icon{
+  animation:card-treasure-burst 1.35s ease-in-out infinite}
+.map-card-reveal.effect-steal .map-card-front .map-card-icon,
+.map-card-reveal.effect-lose-to .map-card-front .map-card-icon{
+  animation:card-thief-dash 1.3s ease-in-out infinite}
+.map-card-reveal.effect-lose .map-card-front .map-card-icon,
+.map-card-reveal.effect-skip-turn .map-card-front .map-card-icon{
+  animation:card-warning-shake 1.4s ease-in-out infinite}
+.map-card-reveal.effect-quiz .map-card-front .map-card-icon{
+  animation:card-quiz-spark 1.8s ease-in-out infinite}
+.map-card-reveal.effect-rent-shield .map-card-front .map-card-icon{
+  animation:card-shield-glow 1.7s ease-in-out infinite}
+.map-card-reveal.effect-collect-all .map-card-front .map-card-icon,
+.map-card-reveal.effect-give-all .map-card-front .map-card-icon{
+  animation:card-coins-float 1.65s ease-in-out infinite}
+@keyframes card-treasure-burst{0%,100%{transform:scale(.92) rotate(-6deg)}40%{transform:scale(1.27) rotate(10deg)}70%{transform:scale(1.05)}}
+@keyframes card-thief-dash{0%,100%{transform:translateX(-13px) rotate(-13deg)}50%{transform:translateX(13px) rotate(12deg)}}
+@keyframes card-warning-shake{0%,100%{transform:rotate(0)}30%{transform:rotate(-12deg)}60%{transform:rotate(9deg)}}
+@keyframes card-quiz-spark{0%,100%{transform:translateY(0) scale(.98)}40%{transform:translateY(-9px) scale(1.17)}}
+@keyframes card-shield-glow{0%,100%{transform:scale(1);filter:drop-shadow(0 0 0 #6ce4bc)}50%{transform:scale(1.14);filter:drop-shadow(0 0 12px #65deb8)}}
+@keyframes card-coins-float{0%,100%{transform:translateY(0) rotate(-8deg)}50%{transform:translateY(-11px) rotate(8deg)}}
+@media(prefers-reduced-motion:reduce){.map-card-front .map-card-icon{animation:none!important}}
+
+.rent-shield-notice{margin:10px 0;padding:10px 13px;border:1px solid #9ed9c7;
+ border-radius:11px;background:#e8faf2;color:#25715c;font-size:12px;font-weight:800;line-height:1.5}

@@ -764,3 +764,14 @@ test('v2.2.0 大富翁等待室展示十二種不同動作的動物，並標示�
   assert.ok(css.includes('@media(prefers-reduced-motion:reduce)'));
   assert.ok(index.includes('動物派對'));
 });
+
+test('v2.2.0 不同卡片具有專屬圖示動作，租金保護券會顯示在個人資產上',()=>{
+  const css=fs.readFileSync(path.join(__dirname,'../public/style.css'),'utf8');
+  for(const kind of ['gain','steal','lose','quiz','rent-shield','give-all','collect-all','skip-turn']){
+    assert.ok(css.includes('.map-card-reveal.effect-'+kind+' .map-card-front .map-card-icon'),kind);
+  }
+  assert.ok(app.includes("' effect-'+effect"));
+  assert.ok(app.includes('p.rentShield'));
+  assert.ok(app.includes('rent-shield-notice'));
+  assert.ok(css.includes('.rent-shield-notice{'));
+});

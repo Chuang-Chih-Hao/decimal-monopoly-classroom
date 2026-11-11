@@ -24,7 +24,7 @@ test('v2.2.0 計算機除以零需顯示錯誤，恢復後可重新計算',()=>{
   calc.press('2');assert.equal(calc.display,'2');
   calc.press('AC');assert.equal(calc.display,'0');
   calc.press('9');calc.press('±');assert.equal(calc.display,'-9');
-  calc.press('⌫');assert.equal(calc.display,'-');
+  calc.press('⌫');assert.equal(calc.display,'0');
   calc.press('AC');assert.equal(calc.display,'0');
 });
 test('v2.2.0 計算機支援連續運算、小數四捨五入與操作後的狀態清除',()=>{

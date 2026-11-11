@@ -33,7 +33,7 @@
         else if(!this.display.includes('.'))this.display+='.';
       }else if(key==='⌫'){
         if(this.fresh){this.display='0';this.fresh=false;}
-        else this.display=this.display.slice(0,-1)||'0';
+        else {const next=this.display.slice(0,-1);this.display=next===''||next==='-'?'0':next;}
       }else if(key==='±'){
         if(this.display!=='0')this.display=this.display.startsWith('-')?this.display.slice(1):'-'+this.display;
       }else if(key==='π'){

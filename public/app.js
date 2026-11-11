@@ -301,7 +301,9 @@
     const type=chance?'機會卡':'命運卡';
     const kindIcon=chance?'🍀':'🔮';
     view.hidden=false;
-    view.className='map-card-reveal kind-'+(chance?'chance':'fate');
+    const effect=['gain','lose','steal','lose-to','quiz','collect-all','give-all','rent-shield','skip-turn']
+      .includes(card.effect)?card.effect:'event';
+    view.className='map-card-reveal kind-'+(chance?'chance':'fate')+' effect-'+effect;
     view.innerHTML=`<div class="map-card-flip"><div class="map-card-inner">
       <div class="map-card-face map-card-back"><span class="map-card-icon">${kindIcon}</span><strong>${type}</strong><small>翻開看看！</small></div>
       <div class="map-card-face map-card-front">
@@ -1206,10 +1208,11 @@
     const paint=colorFor(p),assetValue=landValue(p);
     const jailNotice=p.jailed?'<div class="jail-player-warning">🚔 監獄中：下次輪到時須服刑或保釋出獄。</div>'
       :p.bailPurchaseBan?'<div class="jail-player-warning">🚫 本回合保釋出獄：不可購買房產。</div>':'';
+    const shieldNotice=p.rentShield?'<div class="rent-shield-notice">🛡️ 租金保護券：下次踩到別人的房產可免付一次過路費，並略過猜拳。</div>':'';
     const properties=p.properties.map(id=>state.board[id]).filter(Boolean).sort((a,b)=>a.id-b.id);
     el.innerHTML=`<div class="assets-header" style="${colorStyle(p)}"><span class="assets-title">💼 我的資產</span><span class="my-identity">${animalHtml(p.animal)} ${esc(p.name)} · ${paint.name}</span></div>
       <div class="asset-totals" style="${colorStyle(p)}"><div class="asset-metric"><span>💵 現金餘額</span><strong>${money(p.cash)}</strong></div><div class="asset-metric"><span>🏠 房產總值</span><strong>${money(assetValue)}</strong></div><div class="asset-metric asset-sum"><span>💰 總資產</span><strong>${money(wealth(p))}</strong></div></div>
-      ${jailNotice}<div class="assets-land-heading">🏡 我的房產（${properties.length} 處）<small>點選可定位到棋盤</small></div>
+      ${jailNotice}${shieldNotice}<div class="assets-land-heading">🏡 我的房產（${properties.length} 處）<small>點選可定位到棋盤</small></div>
       <div class="assets-property-list">${properties.length?properties.map(tile=>`<button type="button" class="asset-property" style="${colorStyle(p)}" data-asset-tile="${tile.id}" title="聚焦到 ${esc(tile.name)}"><span class="asset-property-name">${esc(tile.icon)} ${esc(tile.name)}</span><span>價值 ${money(tile.price)} · 租金 ${money(tile.rent)}</span></button>`).join(''):'<span class="assets-empty">還沒有房產。答對購地題後就能購買，土地會以你的代表色標示。</span>'}</div>`;
     el.querySelectorAll('[data-asset-tile]').forEach(btn=>btn.addEventListener('click',()=>{
       if(activeRollAnimation){showToast('棋子正在移動，請稍後再查看房產。');return;}
