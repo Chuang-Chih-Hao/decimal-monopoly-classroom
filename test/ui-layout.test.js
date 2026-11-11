@@ -591,7 +591,7 @@ test('v1.8.3 其他長事件也不截斷，且標題與訊息有獨立一致的�
   assert.match(css,/\.event-spotlight \.spotlight-copy \.spotlight-detail\s*\{[^}]*font-size:/);
   assert.match(css,/\.spotlight-detail\s*\{[^}]*overflow-wrap:anywhere/);
   assert.match(css,/@media\(max-width:640px\)\{[^}]*\.event-spotlight \.spotlight-copy \.spotlight-title/);
-  assert.ok(index.includes('/app.js?v=2.1.0'));
+  assert.ok(index.includes('/app.js?v=2.2.0'));
 });
 
 

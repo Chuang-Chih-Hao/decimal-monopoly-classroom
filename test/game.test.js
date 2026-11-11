@@ -600,8 +600,8 @@ test('機會卡可偷取別人零用錢，命運卡可被偷；金錢守恆且�
   const original=room.players.reduce((sum,p)=>sum+p.cash,0);
   const old=Math.random;
   try{
-    // 六張卡第 2 張：攔截金幣，偷對手最多 $60
-    Math.random=()=>.2;
+    // 12 張卡第 2 張：攔截金幣，偷對手最多 $60
+    Math.random=()=>.1;
     game.land(room,host,BOARD[4]);
     game.drawCard(room,host.id);
     assert.equal(host.cash,960);assert.equal(student.cash,840);
@@ -618,7 +618,7 @@ test('機會卡可偷取別人零用錢，命運卡可被偷；金錢守恆且�
 test('抽到答題卡才開啟圓形題；超時自動抽牌；房主可略過',()=>{
   const {game,room,host}=setup();const old=Math.random;
   try{
-    Math.random=()=>.4; // chance 第 3 張: quiz
+    Math.random=()=>.17; // 12 張機會卡的第 3 張: quiz
     game.land(room,host,BOARD[4]);
     const picked=game.drawCard(room,host.id);
     assert.equal(picked.effect,'quiz');
